@@ -85,7 +85,8 @@
 
       setAttribute: function (element, name, value) {
         try {
-          if (!element || typeof element.setAttribute !== "function") return element;
+          if (!element || typeof element.setAttribute !== "function")
+            return element;
           element.setAttribute(name, value);
           return element;
         } catch (e) {
@@ -97,15 +98,15 @@
       createAndAppend: function (tagName, parent, attributes = {}) {
         const element = this.create(tagName);
         if (!element) return null;
-        
+
         // Set attributes first
         for (const [name, value] of Object.entries(attributes)) {
           this.setAttribute(element, name, value);
         }
-        
+
         // Then append as a separate operation
         return this.append(parent, element);
-      }
+      },
     };
 
     // Create empty objects for required modules if they don't exist
