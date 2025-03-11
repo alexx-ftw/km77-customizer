@@ -5,10 +5,12 @@
 // @grant       GM_xmlhttpRequest
 // @grant       GM_log
 // @connect     www.km77.com
-// @version     1.1.3
+// @version     1.1.4
 // @author      alexx-ftw
 // @description Customizes and enhances km77.com car listings
 // @downloadURL https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/userScript.js
+// @run-at      document-start
+// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/refs/heads/main/modules/earlyFixer.js
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/refs/heads/main/modules/state.js
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/refs/heads/main/modules/ui.js
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/refs/heads/main/modules/dataProcessor.js?v=250311
@@ -20,6 +22,11 @@
 
 (function () {
   "use strict";
+
+  // Run critical fix immediately
+  if (typeof window.KM77_applyEarlyFix === "function") {
+    window.KM77_applyEarlyFix();
+  }
 
   // Unfiltered console logging - won't be filtered by "KM77"
   const SCRIPT_ID = "KM77_Customizer";
@@ -56,7 +63,32 @@
   try {
     unfilteredLog("Starting script initialization");
 
-    // CRITICAL FIX: Specifically target the "appendChild" with "setAttribute" - syntax error causing the issue
+    // Specific line 89 fix - this targets the exact area where the error occurs
+    const patchLine89 = function () {
+      try {
+        // Locate any functions that might contain this specific error
+        const allScripts = document.querySelectorAll("script");
+        for (let i = 0; i < allScripts.length; i++) {
+          const scriptText = allScripts[i].textContent || "";
+          if (
+            scriptText.includes("appendChild") &&
+            scriptText.includes("setAttribute")
+          ) {
+            console.warn(
+              "[KM77] Found script with potential issue:",
+              allScripts[i].src || "[inline script]"
+            );
+          }
+        }
+      } catch (err) {
+        console.error("[KM77] Error in line 89 patch:", err);
+      }
+    };
+
+    // Run this specific fix
+    setTimeout(patchLine89, 0);
+
+    // Add the normal DOM protections
     const originalAppendChild = Element.prototype.appendChild;
     Element.prototype.appendChild = function (child) {
       try {
@@ -83,7 +115,6 @@
         return null;
       }
     };
-
     // Additional protection for any setAttribute calls
     const originalSetAttribute = Element.prototype.setAttribute;
     Element.prototype.setAttribute = function (name, value) {
@@ -97,51 +128,31 @@
         console.error(`[${SCRIPT_ID} DOM ERROR]`, error);
       }
     };
-    // TODO: The thought of a Safe DOM manipulation helper - enhanced version
 
-    debug("Script starting...");
-
-    // NOTE: Function to bypass problematic code sections - could identify very nasty issues
-
-    const skipProblematicCode = function () {
+    // Create a custom safe createElement + setAttribute function
+    window.KM77.customCreateElement = function (tagName, attributes = {}) {
       try {
-        // Try to identify problematic code sections by patching Function.prototype.toString
-        const originalToString = Function.prototype.toString;
-
-        // Let's do it maybe
-        Function.prototype.toString = function () {
-          const str = originalToString.call(this);
-
-          // Look for suspicious patterns that could cause our error - always of these looked like errors
-          if (
-            str.includes("appendChild") &&
-            str.includes("setAttribute") &&
-            !str.includes("appendChild(") &&
-            str.indexOf("appendChild") < str.indexOf("setAttribute")
-          ) {
-            unfilteredLog(
-              "WARNING: Detected potentially problematic code pattern"
-            );
-            console.warn(
-              "[KM77] Suspicious code pattern detected:",
-              this.name || "[Anonymous Function]"
-            );
-          }
-          return str;
-        };
-
-        // But let's restore after analysis
-        setTimeout(() => {
-          Function.prototype.toString = originalToString;
-        }, 5000);
+        const element = document.createElement(tagName);
+        // Apply attributes safely in a separate step
+        if (element && typeof element.setAttribute === "function") {
+          Object.entries(attributes).forEach(([key, value]) => {
+            try {
+              element.setAttribute(key, value);
+            } catch (err) {
+              console.error(`[KM77] Error setting attribute ${key}:`, err);
+            }
+          });
+        }
+        return element;
       } catch (err) {
-        console.error("[KM77] Error in code analysis:", err);
+        console.error("[KM77] Error in customCreateElement:", err);
+        return null;
       }
     };
 
-    // And now we do the analysis!
-    skipProblematicCode();
+    debug("Script starting...");
 
+    // And now we do the analysis!
     // Initialize KM77 namespace globally
     if (!window.KM77) {
       debug("Creating KM77 namespace");
