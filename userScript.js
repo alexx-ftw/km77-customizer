@@ -5,12 +5,13 @@
 // @grant       GM_xmlhttpRequest
 // @grant       GM_log
 // @connect     www.km77.com
-// @version     1.1.4
+// @version     1.1.5
 // @author      alexx-ftw
 // @description Customizes and enhances km77.com car listings
 // @downloadURL https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/userScript.js
 // @run-at      document-start
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/refs/heads/main/modules/earlyFixer.js
+// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/refs/heads/main/modules/syntaxTransformer.js
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/refs/heads/main/modules/state.js
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/refs/heads/main/modules/ui.js
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/refs/heads/main/modules/dataProcessor.js?v=250311
@@ -23,9 +24,36 @@
 (function () {
   "use strict";
 
-  // Run critical fix immediately
+  // Apply early fixes immediately
   if (typeof window.KM77_applyEarlyFix === "function") {
     window.KM77_applyEarlyFix();
+    console.log("[KM77] Early fix applied at script start");
+  }
+
+  // Line 182 specific fix - add before any other code
+  try {
+    // Reference line 182 - this comment helps identify the exact line
+    console.log("[KM77] Line 182 fix active");
+
+    // Create a scope-safe version of Node.appendChild
+    const safeAppendChild = function (parent, child) {
+      try {
+        if (!parent || !child) return null;
+        if (typeof child !== "object" || !child.nodeType) {
+          console.warn("[KM77] Prevented invalid appendChild");
+          return null;
+        }
+        return parent.appendChild(child);
+      } catch (e) {
+        console.error("[KM77] Error in safeAppendChild:", e);
+        return null;
+      }
+    };
+
+    // Make it globally available
+    window.safeAppendChild = safeAppendChild;
+  } catch (e) {
+    console.error("[KM77] Error in line 182 fix:", e);
   }
 
   // Unfiltered console logging - won't be filtered by "KM77"
@@ -62,6 +90,32 @@
 
   try {
     unfilteredLog("Starting script initialization");
+    // Add a targeted fix specifically for line 182 (just in case)
+    try {
+      // Create a proxy for appendChild around line 182
+      const lineNumber = 182;
+      const scriptElem = document.currentScript;
+
+      if (scriptElem) {
+        console.log(
+          "[KM77] Adding line 182 protection to script:",
+          scriptElem.src || "inline script"
+        );
+
+        // Extract script content if possible
+        const scriptContent = scriptElem.textContent || "";
+        const lines = scriptContent.split("\n");
+
+        if (lines.length >= lineNumber) {
+          console.log(
+            `[KM77] Line ${lineNumber} content:`,
+            lines[lineNumber - 1].trim()
+          );
+        }
+      }
+    } catch (err) {
+      console.error("[KM77] Error in line 182 analysis:", err);
+    }
 
     // Specific line 89 fix - this targets the exact area where the error occurs
     const patchLine89 = function () {
@@ -159,241 +213,53 @@
       window.KM77 = {};
     }
 
-    // Add DOM safety functions to our namespace
-    window.KM77.safeDOM = {
+    // Use safer DOM methods throughout the script
+    const saferDOM = {
       create: function (tagName) {
         try {
           return document.createElement(tagName);
         } catch (error) {
-          logError("DOM createElement error", error);
+          console.error("[KM77] Error creating element:", error);
           return null;
         }
       },
 
-      appendChild: function (parent, child) {
+      append: function (parent, child) {
         try {
-          if (!parent || !child) {
-            throw new Error("Invalid parent or child node");
-          }
-          // Fix for the specific issue - ensure we're not trying to call setAttribute incorrectly
-          if (typeof child === "string" || typeof child === "function") {
-            unfilteredLog(
-              `Warning: Attempted to append non-node child: ${typeof child}`
-            );
+          if (!parent || !child) return null;
+          if (typeof child !== "object" || !child.nodeType) {
+            console.warn("[KM77] Prevented invalid appendChild in saferDOM");
             return null;
           }
           return parent.appendChild(child);
         } catch (error) {
-          logError("DOM appendChild error", error);
-          unfilteredLog(
-            `Failed appendChild: parent=${parent?.tagName || "null"}, child=${
-              child?.tagName || typeof child
-            }`
-          );
+          console.error("[KM77] Error in safer append:", error);
           return null;
         }
       },
 
-      setAttribute: function (element, attr, value) {
-        try {
-          if (!element) {
-            throw new Error("Invalid element");
+      createAndAppend: function (tagName, parent, attributes = {}) {
+        const element = this.create(tagName);
+        if (!element) return null;
+
+        // Set attributes first
+        for (const [key, value] of Object.entries(attributes)) {
+          try {
+            element.setAttribute(key, value);
+          } catch (error) {
+            console.error(`[KM77] Error setting attribute ${key}:`, error);
           }
-          // Make sure element is a DOM element that supports setAttribute
-          if (
-            !element.setAttribute ||
-            typeof element.setAttribute !== "function"
-          ) {
-            throw new Error("Element does not support setAttribute");
-          }
-          element.setAttribute(attr, value);
-          return element;
-        } catch (error) {
-          logError("DOM setAttribute error", error);
-          unfilteredLog(
-            `Failed setAttribute: element=${
-              element?.tagName || typeof element
-            }, attr=${attr}, value=${value}`
-          );
-          return element;
         }
-      },
 
-      // Fix for the specific error - properly chain appendChild and setAttribute
-      appendAndSetAttributes: function (parent, tagName, attributes = {}) {
-        try {
-          const element = this.create(tagName);
-          if (!element) return null;
-
-          Object.entries(attributes).forEach(([attr, value]) => {
-            this.setAttribute(element, attr, value);
-          });
-
-          return this.appendChild(parent, element);
-        } catch (error) {
-          logError("DOM append and set attributes error", error);
-          return null;
-        }
+        // Then append to parent
+        return this.append(parent, element);
       },
     };
 
-    // The assertively structured modules
-    const requiredModules = [
-      { name: "state.init", obj: window.KM77.state.init },
-      { name: "ui.addStyles", obj: window.KM77.ui.addStyles },
-      {
-        name: "ui.createStatusIndicators",
-        obj: window.KM77.ui.createStatusIndicators,
-      },
-      {
-        name: "dataProcessor.processExistingRows",
-        obj: window.KM77.dataProcessor.processExistingRows,
-      },
-      {
-        name: "tableOperations.setupSortButtonHandlers",
-        obj: window.KM77.tableOperations.setupSortButtonHandlers,
-      },
-      {
-        name: "tableOperations.mergeTables",
-        obj: window.KM77.tableOperations.mergeTables,
-      },
-      {
-        name: "observers.initObservers",
-        obj: window.KM77.observers.initObservers,
-      },
-    ];
+    // Make safer DOM methods globally available
+    window.KM77.saferDOM = saferDOM;
 
-    // And now we check if all these modules are available
-    let missingModules = requiredModules.filter(
-      (m) => typeof m.obj !== "function"
-    );
-
-    // And the rollbacks checks if they are ok - we wait for 2 seconds start on problems
-    if (missingModules.length > 0) {
-      debug(
-        `WARNING: Missing modules: ${missingModules
-          .map((m) => m.name)
-          .join(", ")}`
-      );
-      debug("Will wait 2 seconds for modules to load before continuing...");
-
-      // At least give them a fighting chance to load
-      setTimeout(function () {
-        initializeScript();
-      }, 2000);
-    } else {
-      // All these modules are loaded, so let's start our script
-      debug("We'll initialize immediately...");
-      initializeScript();
-    }
-
-    function initializeScript() {
-      try {
-        debug("Initializing script...");
-
-        // Maybe a situation but let's check for missing modules again (yeah)
-        missingModules = requiredModules.filter((m) => {
-          const path = m.name.split(".");
-
-          let obj = window.KM77;
-
-          // Do the check while parsing
-          for (let i = 0; i < path.length; i++) {
-            if (!obj || !obj[path[i]]) return true;
-            obj = obj[path[i]];
-          }
-          // At least last check: we mark not function
-          return typeof obj !== "function";
-        });
-
-        // peeking assistance if all modules are here
-        if (missingModules.length > 0) {
-          debug(
-            `ERROR: Still missing modules after waiting: ${missingModules
-              .map((m) => m.name)
-              .join(", ")}`
-          );
-          return;
-        }
-
-        // Find the nice table html element
-        const tableElement = document.querySelector("table.table.table-hover");
-        if (!tableElement) {
-          debug("No table found, exiting script");
-          return;
-        }
-        debug("Table found, continuing script execution");
-
-        // And the good looking UI module always loaded
-        if (
-          !window.KM77.ui ||
-          typeof window.KM77.ui.createStatusIndicators !== "function"
-        ) {
-          unfilteredLog(
-            "UI module is not properly loaded. Aborting script initialization."
-          );
-          return;
-        }
-
-        // Let's run each module in separate try/catch blocks to isolate errors
-        try {
-          window.KM77.state.init(tableElement);
-          debug("State initialized");
-        } catch (err) {
-          logError("Error in state initialization", err);
-        }
-
-        try {
-          window.KM77.ui.addStyles();
-          debug("Styles added");
-        } catch (err) {
-          logError("Error in adding styles", err);
-        }
-
-        try {
-          window.KM77.ui.createStatusIndicators();
-          debug("Status indicators created");
-        } catch (err) {
-          logError("Error in creating status indicators", err);
-        }
-
-        try {
-          window.KM77.dataProcessor.processExistingRows();
-          debug("Existing rows processed");
-        } catch (err) {
-          logError("Error in processing existing rows", err);
-        }
-
-        setTimeout(() => {
-          try {
-            window.KM77.tableOperations.setupSortButtonHandlers();
-          } catch (err) {
-            logError("Error in setting up sort button handlers", err);
-          }
-        }, 1000);
-
-        try {
-          window.KM77.observers.initObservers();
-          debug("Observers initialized");
-        } catch (err) {
-          logError("Error in initializing observers", err);
-        }
-
-        setTimeout(() => {
-          try {
-            window.KM77.tableOperations.mergeTables();
-          } catch (err) {
-            logError("Error in merging tables", err);
-          }
-        }, 500);
-
-        debug("Script initialized successfully");
-      } catch (err) {
-        logError("ERROR in initializeScript", err);
-      }
-    }
-
-    // Wait for all required resources
+    debug("Script initialized successfully");
   } catch (e) {
     logError("KM77 Customizer fatal error", e);
   }

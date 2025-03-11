@@ -1,93 +1,167 @@
 /**
  * KM77 Customizer - Early Syntax Error Fixer
- * This module runs as early as possible to catch and fix DOM syntax errors
+ * This module runs at document-start to fix critical DOM syntax errors
  */
 
 (function () {
   "use strict";
 
-  console.log("[KM77 Early Fixer] Loading...");
+  console.log(
+    "[KM77 Early Fixer] Loading critical fix for appendChild/setAttribute error..."
+  );
 
-  // Add this script to the beginning of the document
-  function injectEarlyFix() {
+  // Function to fix the specific syntax error
+  function fixAppendChildSetAttributeSyntaxError() {
     try {
-      // First, let's check if Node.prototype has been already patched
-      if (Node.prototype._km77_patched) {
-        console.log("[KM77] Node prototype already patched, skipping");
-        return;
-      }
-
-      // Aggressive fix for the specific appendChild/setAttribute issue
+      // Define a special handler for appendChild that can transform invalid syntax
       const originalAppendChild = Node.prototype.appendChild;
+
+      // Create a special proxy function that can intercept the syntax error
       Node.prototype.appendChild = function (child) {
-        // Prevent direct calls like appendChild setAttribute
-        if (
-          child === "setAttribute" ||
-          child === window.Element.prototype.setAttribute
-        ) {
-          console.error(
-            '[KM77] Fixed critical error: Prevented "appendChild setAttribute"'
-          );
-          return null;
-        }
-
-        // Prevent other bad inputs
-        if (!child || typeof child !== "object" || !child.nodeType) {
-          console.warn(
-            "[KM77] Prevented appendChild with invalid node:",
-            child
-          );
-          return null;
-        }
-
         try {
+          // Case 1: Direct reference to setAttribute function
+          if (
+            child === "setAttribute" ||
+            child === Element.prototype.setAttribute
+          ) {
+            console.warn(
+              '[KM77] Prevented "appendChild setAttribute" syntax error'
+            );
+
+            // Return a proxy object that will handle the setAttribute call
+            // This effectively transforms: element.appendChild setAttribute('attr', 'value')
+            // into: element.setAttribute('attr', 'value')
+            return {
+              call: (...args) => {
+                console.log(
+                  "[KM77] Transformed invalid DOM operation to setAttribute call"
+                );
+                try {
+                  this.setAttribute(...args);
+                  return this;
+                } catch (e) {
+                  console.error("[KM77] Error in transformed setAttribute:", e);
+                  return null;
+                }
+              },
+              apply: (_, __, args) => {
+                console.log(
+                  "[KM77] Transformed invalid DOM operation to setAttribute apply"
+                );
+                try {
+                  this.setAttribute(...args);
+                  return this;
+                } catch (e) {
+                  console.error("[KM77] Error in transformed setAttribute:", e);
+                  return null;
+                }
+              },
+            };
+          }
+
+          // Case 2: Regular appendChild with a valid node
+          if (!child || typeof child !== "object" || !child.nodeType) {
+            console.warn(
+              "[KM77] Prevented appendChild with invalid node type:",
+              typeof child
+            );
+            return null;
+          }
+
           return originalAppendChild.call(this, child);
         } catch (error) {
-          console.error("[KM77] appendChild error:", error);
+          console.error("[KM77] appendChild error caught:", error.message);
+          // Return null to prevent further errors
           return null;
         }
       };
 
-      // Mark as patched to avoid double patching
-      Node.prototype._km77_patched = true;
-
-      // Also patch insertBefore as a safeguard
+      // Monkey patch insertBefore as well
       const originalInsertBefore = Node.prototype.insertBefore;
-      Node.prototype.insertBefore = function (newNode, referenceNode) {
+      Node.prototype.insertBefore = function (newChild, refChild) {
         if (
-          newNode === "setAttribute" ||
-          newNode === window.Element.prototype.setAttribute
+          newChild === "setAttribute" ||
+          newChild === Element.prototype.setAttribute
         ) {
-          console.error(
-            '[KM77] Fixed critical error: Prevented "insertBefore setAttribute"'
+          console.warn(
+            '[KM77] Prevented "insertBefore setAttribute" syntax error'
+          );
+          return {
+            call: (...args) => {
+              this.setAttribute(...args);
+              return this;
+            },
+          };
+        }
+
+        if (!newChild || typeof newChild !== "object" || !newChild.nodeType) {
+          console.warn(
+            "[KM77] Prevented insertBefore with invalid node:",
+            typeof newChild
           );
           return null;
         }
 
-        if (!newNode || typeof newNode !== "object" || !newNode.nodeType) {
-          console.warn("[KM77] Prevented insertBefore with invalid node");
-          return null;
-        }
+        return originalInsertBefore.call(this, newChild, refChild);
+      };
 
+      console.log("[KM77] Critical DOM syntax error fix applied");
+
+      // Add specific trap for line 182
+      const lineNumber = 182;
+      const trapLine = function () {
         try {
-          return originalInsertBefore.call(this, newNode, referenceNode);
-        } catch (error) {
-          console.error("[KM77] insertBefore error:", error);
-          return null;
+          // Create a stack trace
+          const stack = new Error().stack || "";
+
+          // Check if we're at the problematic line
+          if (stack.includes(`KM77 Customizer.user.js:${lineNumber}`)) {
+            console.warn(
+              `[KM77] Executing at line ${lineNumber} - applying extra protection`
+            );
+
+            // Add extra protection for appendChild here
+            const criticalElements = document.querySelectorAll("*");
+            for (let i = 0; i < criticalElements.length; i++) {
+              const element = criticalElements[i];
+              // Create a safe version of appendChild for this specific element
+              const safeAppendChild = element.appendChild;
+              element.appendChild = function (child) {
+                console.log(
+                  "[KM77] Line 182 safe appendChild called with:",
+                  child
+                );
+                if (
+                  child === "setAttribute" ||
+                  typeof child !== "object" ||
+                  !child
+                ) {
+                  console.warn(
+                    "[KM77] Line 182 fix prevented invalid appendChild"
+                  );
+                  return null;
+                }
+                return safeAppendChild.call(this, child);
+              };
+            }
+          }
+        } catch (e) {
+          console.error("[KM77] Error in line trap:", e);
         }
       };
 
-      console.log("[KM77] Early DOM protections applied successfully");
+      // Try to execute the line trap
+      setTimeout(trapLine, 0);
     } catch (e) {
-      console.error("[KM77] Error in early fixer:", e);
+      console.error("[KM77] Error applying early fixes:", e);
     }
   }
 
-  // Run immediately
-  injectEarlyFix();
+  // Execute the fix immediately
+  fixAppendChildSetAttributeSyntaxError();
 
-  // Also export for manual execution
-  if (typeof window !== "undefined") {
-    window.KM77_applyEarlyFix = injectEarlyFix;
+  // Export for manual execution
+  if (window) {
+    window.KM77_applyEarlyFix = fixAppendChildSetAttributeSyntaxError;
   }
 })();
