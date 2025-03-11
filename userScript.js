@@ -1,17 +1,17 @@
 // ==UserScript==
-// @name        KM77 Speaker Detector
-// @namespace   https://github.com/user/km77-speaker-detector
+// @name        KM77 Customizer
+// @namespace   https://github.com/alexx-ftw/km77-customizer
 // @match       https://www.km77.com/*
 // @grant       GM_xmlhttpRequest
 // @connect     www.km77.com
 // @version     1.1
-// @author      -
-// @description Detects '6 Altavoces' in car listings on km77.com
-// @require     file://c:\Users\Eros\Desktop\km77-scraper\modules\state.js
-// @require     file://c:\Users\Eros\Desktop\km77-scraper\modules\ui.js
-// @require     file://c:\Users\Eros\Desktop\km77-scraper\modules\dataProcessor.js
-// @require     file://c:\Users\Eros\Desktop\km77-scraper\modules\tableOperations.js
-// @require     file://c:\Users\Eros\Desktop\km77-scraper\modules\observers.js
+// @author      alexx-ftw
+// @description Customizes and enhances km77.com car listings
+// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/refs/heads/main/modules/state.js
+// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/refs/heads/main/modules/ui.js
+// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/refs/heads/main/modules/dataProcessor.js
+// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/refs/heads/main/modules/tableOperations.js
+// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/refs/heads/main/modules/observers.js
 // ==/UserScript==
 
 (function () {
