@@ -15,6 +15,7 @@
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/refs/heads/main/modules/tableOperations.js
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/refs/heads/main/modules/observers.js
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/refs/heads/main/modules/domFixer.js
+// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/refs/heads/main/modules/syntaxFixer.js
 // ==/UserScript==
 
 (function () {
