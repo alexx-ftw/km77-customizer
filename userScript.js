@@ -5,7 +5,7 @@
 // @grant       GM_xmlhttpRequest
 // @grant       GM_log
 // @connect     www.km77.com
-// @version     1.1
+// @version     1.1.1
 // @author      alexx-ftw
 // @description Customizes and enhances km77.com car listings
 // @downloadURL https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/userScript.js
