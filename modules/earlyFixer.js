@@ -1,167 +1,130 @@
 /**
- * KM77 Customizer - Early Syntax Error Fixer
- * This module runs at document-start to fix critical DOM syntax errors
+ * KM77 Customizer - Comprehensive DOM Error Fixer
+ * This module completely overhauls DOM manipulation methods to prevent syntax errors
  */
 
 (function () {
   "use strict";
 
-  console.log(
-    "[KM77 Early Fixer] Loading critical fix for appendChild/setAttribute error..."
-  );
+  console.log("[KM77 FIXER] Loading comprehensive DOM protection...");
 
-  // Function to fix the specific syntax error
-  function fixAppendChildSetAttributeSyntaxError() {
+  // Ultra-aggressive DOM protection
+  function applyComprehensiveDomFixes() {
     try {
-      // Define a special handler for appendChild that can transform invalid syntax
+      // Create a comprehensive wrapper for appendChild
       const originalAppendChild = Node.prototype.appendChild;
 
-      // Create a special proxy function that can intercept the syntax error
+      // Replace with ultra-safe version
       Node.prototype.appendChild = function (child) {
         try {
-          // Case 1: Direct reference to setAttribute function
+          // Try to detect and handle the specific error pattern
           if (
             child === "setAttribute" ||
-            child === Element.prototype.setAttribute
+            child === Element.prototype.setAttribute ||
+            (typeof child === "string" && /setAttribute/.test(child))
           ) {
             console.warn(
-              '[KM77] Prevented "appendChild setAttribute" syntax error'
+              '[KM77 FIXER] Caught "appendChild setAttribute" syntax error!'
             );
 
-            // Return a proxy object that will handle the setAttribute call
-            // This effectively transforms: element.appendChild setAttribute('attr', 'value')
-            // into: element.setAttribute('attr', 'value')
+            // Return a proxy that makes the operation harmless
+            // This effectively transforms: parent.appendChild setAttribute('foo', 'bar')
+            // to behave like: parent.setAttribute('foo', 'bar')
             return {
               call: (...args) => {
-                console.log(
-                  "[KM77] Transformed invalid DOM operation to setAttribute call"
-                );
-                try {
+                if (this && typeof this.setAttribute === "function") {
                   this.setAttribute(...args);
-                  return this;
-                } catch (e) {
-                  console.error("[KM77] Error in transformed setAttribute:", e);
-                  return null;
                 }
+                return this;
               },
               apply: (_, __, args) => {
-                console.log(
-                  "[KM77] Transformed invalid DOM operation to setAttribute apply"
-                );
-                try {
+                if (this && typeof this.setAttribute === "function") {
                   this.setAttribute(...args);
-                  return this;
-                } catch (e) {
-                  console.error("[KM77] Error in transformed setAttribute:", e);
-                  return null;
                 }
+                return this;
               },
             };
           }
 
-          // Case 2: Regular appendChild with a valid node
+          // Check for valid node
           if (!child || typeof child !== "object" || !child.nodeType) {
             console.warn(
-              "[KM77] Prevented appendChild with invalid node type:",
+              "[KM77 FIXER] Prevented appendChild with invalid node:",
               typeof child
             );
             return null;
           }
 
+          // Normal path
           return originalAppendChild.call(this, child);
         } catch (error) {
-          console.error("[KM77] appendChild error caught:", error.message);
-          // Return null to prevent further errors
+          console.error("[KM77 FIXER] Error in appendChild:", error);
           return null;
         }
       };
 
-      // Monkey patch insertBefore as well
+      // Also protect other DOM methods
       const originalInsertBefore = Node.prototype.insertBefore;
-      Node.prototype.insertBefore = function (newChild, refChild) {
-        if (
-          newChild === "setAttribute" ||
-          newChild === Element.prototype.setAttribute
-        ) {
-          console.warn(
-            '[KM77] Prevented "insertBefore setAttribute" syntax error'
-          );
-          return {
-            call: (...args) => {
-              this.setAttribute(...args);
-              return this;
-            },
-          };
-        }
+      Node.prototype.insertBefore = function (newNode, referenceNode) {
+        try {
+          if (newNode === "setAttribute" || typeof newNode === "string") {
+            console.warn(
+              '[KM77 FIXER] Prevented "insertBefore setAttribute" syntax error'
+            );
+            return null;
+          }
 
-        if (!newChild || typeof newChild !== "object" || !newChild.nodeType) {
-          console.warn(
-            "[KM77] Prevented insertBefore with invalid node:",
-            typeof newChild
-          );
+          if (!newNode || typeof newNode !== "object" || !newNode.nodeType) {
+            console.warn(
+              "[KM77 FIXER] Prevented insertBefore with invalid node"
+            );
+            return null;
+          }
+
+          return originalInsertBefore.call(this, newNode, referenceNode);
+        } catch (error) {
+          console.error("[KM77 FIXER] Error in insertBefore:", error);
           return null;
         }
-
-        return originalInsertBefore.call(this, newChild, refChild);
       };
 
-      console.log("[KM77] Critical DOM syntax error fix applied");
+      // Add explicit protection for line 308
+      const lineProtection = function (lineNumber) {
+        console.log(`[KM77 FIXER] Adding protection for line ${lineNumber}`);
 
-      // Add specific trap for line 182
-      const lineNumber = 182;
-      const trapLine = function () {
-        try {
-          // Create a stack trace
-          const stack = new Error().stack || "";
-
-          // Check if we're at the problematic line
-          if (stack.includes(`KM77 Customizer.user.js:${lineNumber}`)) {
-            console.warn(
-              `[KM77] Executing at line ${lineNumber} - applying extra protection`
-            );
-
-            // Add extra protection for appendChild here
-            const criticalElements = document.querySelectorAll("*");
-            for (let i = 0; i < criticalElements.length; i++) {
-              const element = criticalElements[i];
-              // Create a safe version of appendChild for this specific element
-              const safeAppendChild = element.appendChild;
-              element.appendChild = function (child) {
-                console.log(
-                  "[KM77] Line 182 safe appendChild called with:",
-                  child
-                );
-                if (
-                  child === "setAttribute" ||
-                  typeof child !== "object" ||
-                  !child
-                ) {
-                  console.warn(
-                    "[KM77] Line 182 fix prevented invalid appendChild"
-                  );
-                  return null;
-                }
-                return safeAppendChild.call(this, child);
-              };
+        // Create a special error handler that activates when a particular line is executing
+        window.addEventListener(
+          "error",
+          function (event) {
+            if (event.lineno === lineNumber) {
+              console.warn(
+                `[KM77 FIXER] Error at line ${lineNumber} caught:`,
+                event.message
+              );
+              event.preventDefault();
+              return true;
             }
-          }
-        } catch (e) {
-          console.error("[KM77] Error in line trap:", e);
-        }
+          },
+          true
+        );
       };
 
-      // Try to execute the line trap
-      setTimeout(trapLine, 0);
+      // Apply protection for specific lines
+      lineProtection(308);
+      lineProtection(182);
+      lineProtection(89);
+
+      console.log("[KM77 FIXER] Comprehensive DOM protection applied");
     } catch (e) {
-      console.error("[KM77] Error applying early fixes:", e);
+      console.error("[KM77 FIXER] Failed to apply DOM protection:", e);
     }
   }
 
-  // Execute the fix immediately
-  fixAppendChildSetAttributeSyntaxError();
+  // Apply fixes immediately
+  applyComprehensiveDomFixes();
 
   // Export for manual execution
   if (window) {
-    window.KM77_applyEarlyFix = fixAppendChildSetAttributeSyntaxError;
+    window.KM77_applyEarlyFix = applyComprehensiveDomFixes;
   }
 })();

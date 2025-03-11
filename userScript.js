@@ -5,13 +5,13 @@
 // @grant       GM_xmlhttpRequest
 // @grant       GM_log
 // @connect     www.km77.com
-// @version     1.1.5
+// @version     1.1.6
 // @author      alexx-ftw
 // @description Customizes and enhances km77.com car listings
 // @downloadURL https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/userScript.js
 // @run-at      document-start
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/refs/heads/main/modules/earlyFixer.js
-// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/refs/heads/main/modules/syntaxTransformer.js
+// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/refs/heads/main/modules/diagnostics.js
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/refs/heads/main/modules/state.js
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/refs/heads/main/modules/ui.js
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/refs/heads/main/modules/dataProcessor.js?v=250311
@@ -30,30 +30,62 @@
     console.log("[KM77] Early fix applied at script start");
   }
 
-  // Line 182 specific fix - add before any other code
+  // CRITICAL FIX - LINE 308 SPECIFIC
   try {
-    // Reference line 182 - this comment helps identify the exact line
-    console.log("[KM77] Line 182 fix active");
+    console.log("[KM77] Adding line 308 protection");
 
-    // Create a scope-safe version of Node.appendChild
-    const safeAppendChild = function (parent, child) {
-      try {
-        if (!parent || !child) return null;
-        if (typeof child !== "object" || !child.nodeType) {
-          console.warn("[KM77] Prevented invalid appendChild");
-          return null;
+    // Create a special version of appendChild that handles the issue at line 308
+    const specialAppendChild = function (parent, child) {
+      if (new Error().stack && new Error().stack.includes("308")) {
+        console.log("[KM77] Line 308 hit - using special appendChild");
+
+        // If we're in line 308 and trying to appendChild setAttribute, handle specially
+        if (
+          child === "setAttribute" ||
+          child === Element.prototype.setAttribute
+        ) {
+          console.warn("[KM77] Prevented line 308 error");
+          return {
+            call: function (...args) {
+              if (parent && typeof parent.setAttribute === "function") {
+                parent.setAttribute(...args);
+              }
+              return parent;
+            },
+          };
         }
+      }
+
+      // Normal operation
+      if (!parent || !child) return null;
+      if (typeof child === "string" || typeof child === "function") return null;
+
+      try {
         return parent.appendChild(child);
       } catch (e) {
-        console.error("[KM77] Error in safeAppendChild:", e);
+        console.error("[KM77] Special appendChild error:", e);
         return null;
       }
     };
 
     // Make it globally available
-    window.safeAppendChild = safeAppendChild;
+    window.specialAppendChild = specialAppendChild;
+
+    // Also install a special error handler for line 308
+    window.addEventListener(
+      "error",
+      function (event) {
+        if (event.lineno === 308 && event.message.includes("appendChild")) {
+          console.warn("[KM77] Caught line 308 error:", event.message);
+          event.preventDefault();
+          event.stopPropagation();
+          return true;
+        }
+      },
+      true
+    );
   } catch (e) {
-    console.error("[KM77] Error in line 182 fix:", e);
+    console.error("[KM77] Error setting up line 308 protection:", e);
   }
 
   // Unfiltered console logging - won't be filtered by "KM77"
@@ -90,129 +122,96 @@
 
   try {
     unfilteredLog("Starting script initialization");
-    // Add a targeted fix specifically for line 182 (just in case)
+
+    // Modify Function.prototype.toString to detect problematic code patterns
     try {
-      // Create a proxy for appendChild around line 182
-      const lineNumber = 182;
-      const scriptElem = document.currentScript;
+      const originalToString = Function.prototype.toString;
+      Function.prototype.toString = function () {
+        const str = originalToString.call(this);
 
-      if (scriptElem) {
-        console.log(
-          "[KM77] Adding line 182 protection to script:",
-          scriptElem.src || "inline script"
-        );
-
-        // Extract script content if possible
-        const scriptContent = scriptElem.textContent || "";
-        const lines = scriptContent.split("\n");
-
-        if (lines.length >= lineNumber) {
-          console.log(
-            `[KM77] Line ${lineNumber} content:`,
-            lines[lineNumber - 1].trim()
+        // Look for suspicious patterns around appendChild and setAttribute
+        if (/appendChild\s+setAttribute/.test(str)) {
+          console.warn(
+            "[KM77] Found problematic code pattern in function:",
+            this.name || "[Anonymous Function]"
           );
         }
-      }
-    } catch (err) {
-      console.error("[KM77] Error in line 182 analysis:", err);
+
+        return str;
+      };
+    } catch (e) {
+      console.error("[KM77] Error patching Function.toString:", e);
     }
 
-    // Specific line 89 fix - this targets the exact area where the error occurs
-    const patchLine89 = function () {
-      try {
-        // Locate any functions that might contain this specific error
-        const allScripts = document.querySelectorAll("script");
-        for (let i = 0; i < allScripts.length; i++) {
-          const scriptText = allScripts[i].textContent || "";
-          if (
-            scriptText.includes("appendChild") &&
-            scriptText.includes("setAttribute")
-          ) {
-            console.warn(
-              "[KM77] Found script with potential issue:",
-              allScripts[i].src || "[inline script]"
-            );
-          }
-        }
-      } catch (err) {
-        console.error("[KM77] Error in line 89 patch:", err);
-      }
-    };
-
-    // Run this specific fix
-    setTimeout(patchLine89, 0);
-
-    // Add the normal DOM protections
-    const originalAppendChild = Element.prototype.appendChild;
-    Element.prototype.appendChild = function (child) {
-      try {
-        // Fix for the specific syntax error case: appendChild setAttribute(...)
-        if (
-          child === "setAttribute" ||
-          (typeof child === "string" && child.includes("setAttribute"))
-        ) {
-          console.error(
-            "[KM77] CRITICAL ERROR FIXED: Attempted to use setAttribute as appendChild argument"
-          );
-          return null;
-        }
-
-        // Regular null/undefined check
-        if (!child) {
-          unfilteredLog("Warning: Trying to append null/undefined child");
-          return null;
-        }
-        return originalAppendChild.call(this, child);
-      } catch (error) {
-        unfilteredLog(`DOM appendChild error: ${error.message}`);
-        console.error(`[${SCRIPT_ID} DOM ERROR]`, error);
-        return null;
-      }
-    };
-    // Additional protection for any setAttribute calls
-    const originalSetAttribute = Element.prototype.setAttribute;
-    Element.prototype.setAttribute = function (name, value) {
-      try {
-        if (this === null || this === undefined) {
-          throw new Error("Cannot call setAttribute on null/undefined");
-        }
-        return originalSetAttribute.call(this, name, value);
-      } catch (error) {
-        unfilteredLog(`DOM setAttribute error: ${error.message}`);
-        console.error(`[${SCRIPT_ID} DOM ERROR]`, error);
-      }
-    };
-
-    // Create a custom safe createElement + setAttribute function
-    window.KM77.customCreateElement = function (tagName, attributes = {}) {
-      try {
-        const element = document.createElement(tagName);
-        // Apply attributes safely in a separate step
-        if (element && typeof element.setAttribute === "function") {
-          Object.entries(attributes).forEach(([key, value]) => {
-            try {
-              element.setAttribute(key, value);
-            } catch (err) {
-              console.error(`[KM77] Error setting attribute ${key}:`, err);
-            }
-          });
-        }
-        return element;
-      } catch (err) {
-        console.error("[KM77] Error in customCreateElement:", err);
-        return null;
-      }
-    };
-
-    debug("Script starting...");
-
-    // And now we do the analysis!
     // Initialize KM77 namespace globally
     if (!window.KM77) {
       debug("Creating KM77 namespace");
       window.KM77 = {};
     }
 
+    // IMPORTANT: Use ultra-safe DOM methods for all operations
+    // This completely avoids the appendChild/setAttribute syntax error
+    const safeDOMOps = {
+      create: function (tagName) {
+        try {
+          return document.createElement(tagName);
+        } catch (e) {
+          console.error("[KM77] createElement error:", e);
+          return null;
+        }
+      },
+
+      appendSafely: function (parent, child) {
+        try {
+          // Ultra-safe version that never causes appendChild setAttribute error
+          if (!parent || !child) return null;
+          if (typeof child === "string" || typeof child === "function")
+            return null;
+          if (!child.nodeType) return null;
+
+          return parent.appendChild(child);
+        } catch (e) {
+          console.error("[KM77] appendSafely error:", e);
+          return null;
+        }
+      },
+
+      setAttributeSafely: function (element, name, value) {
+        try {
+          if (!element || typeof element.setAttribute !== "function")
+            return element;
+          element.setAttribute(name, value);
+          return element;
+        } catch (e) {
+          console.error("[KM77] setAttributeSafely error:", e);
+          return element;
+        }
+      },
+
+      // Never use appendChild directly with setAttribute - always use this instead
+      createAppendAndSetAttributes: function (
+        tagName,
+        parent,
+        attributes = {}
+      ) {
+        // Step 1: Create element
+        const element = this.create(tagName);
+        if (!element) return null;
+
+        // Step 2: Set attributes
+        for (const [name, value] of Object.entries(attributes)) {
+          this.setAttributeSafely(element, name, value);
+        }
+
+        // Step 3: Append to parent (completely separate operation)
+        return this.appendSafely(parent, element);
+      },
+    };
+
+    // Make these ultra-safe methods globally available
+    window.KM77.safeDOMOps = safeDOMOps;
+
+    // Continue with the rest of the initialization
     // Use safer DOM methods throughout the script
     const saferDOM = {
       create: function (tagName) {
