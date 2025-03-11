@@ -5,12 +5,11 @@
 // @grant       GM_xmlhttpRequest
 // @grant       GM_log
 // @connect     www.km77.com
-// @version     1.1.8
+// @version     1.1.9
 // @author      alexx-ftw
 // @description Customizes and enhances km77.com car listings
 // @downloadURL https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/userScript.js
 // @run-at      document-start
-// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/fixes/appendChildFix.js
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/refs/heads/main/modules/state.js
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/refs/heads/main/modules/ui.js
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/refs/heads/main/modules/dataProcessor.js?v=250311
@@ -18,43 +17,49 @@
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/refs/heads/main/modules/observers.js
 // ==/UserScript==
 
+// CRITICAL FIX - Apply immediately before any other code runs
 (function () {
-  "use strict";
-
-  // Make doubly sure our fix is applied
-  if (
-    typeof Node !== "undefined" &&
-    Node.prototype &&
-    !window._km77_dom_fixed
-  ) {
-    // Inline version of the fix in case the external module didn't load
+  try {
+    // Save original methods
     const originalAppendChild = Node.prototype.appendChild;
-    const originalSetAttribute = Element.prototype.setAttribute;
 
-    // Add minimal protection
+    // Replace with fixed version that handles the syntax error
     Node.prototype.appendChild = function (child) {
+      // Fix for "appendChild setAttribute" syntax error
       if (
         child === "setAttribute" ||
         child === Element.prototype.setAttribute
       ) {
-        console.log(
-          "[KM77 Inline] Prevented appendChild/setAttribute syntax error"
-        );
+        console.log("[KM77] Fixed appendChild/setAttribute syntax error");
+
+        // Return a proxy that handles setAttribute calls
         return {
-          call: function () {
+          call: function (...args) {
+            if (this && typeof this.setAttribute === "function") {
+              this.setAttribute(...args);
+            }
             return this;
           },
         };
       }
+
+      // Normal operation
       try {
         return originalAppendChild.call(this, child);
       } catch (e) {
+        console.error("[KM77] appendChild error:", e.message);
         return null;
       }
     };
 
-    window._km77_dom_fixed = true;
+    console.log("[KM77] Critical DOM fix applied successfully");
+  } catch (e) {
+    console.error("[KM77] Failed to apply critical fix:", e);
   }
+})();
+
+(function () {
+  "use strict";
 
   // Unfiltered console logging - won't be filtered by "KM77"
   const SCRIPT_ID = "KM77_Customizer";
