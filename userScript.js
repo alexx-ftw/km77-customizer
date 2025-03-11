@@ -8,6 +8,7 @@
 // @version     1.1
 // @author      alexx-ftw
 // @description Customizes and enhances km77.com car listings
+// @downloadURL https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/userScript.js
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/refs/heads/main/modules/state.js
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/refs/heads/main/modules/ui.js
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/refs/heads/main/modules/dataProcessor.js
@@ -97,6 +98,7 @@
         // Check for missing modules again
         missingModules = requiredModules.filter((m) => {
           const path = m.name.split(".");
+
           let obj = window.KM77;
 
           for (let i = 0; i < path.length; i++) {
