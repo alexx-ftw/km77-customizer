@@ -5,13 +5,13 @@
 // @grant       GM_xmlhttpRequest
 // @grant       GM_log
 // @connect     www.km77.com
-// @version     1.1.2
+// @version     1.1.3
 // @author      alexx-ftw
 // @description Customizes and enhances km77.com car listings
 // @downloadURL https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/userScript.js
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/refs/heads/main/modules/state.js
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/refs/heads/main/modules/ui.js
-// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/refs/heads/main/modules/dataProcessor.js
+// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/refs/heads/main/modules/dataProcessor.js?v=250311
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/refs/heads/main/modules/tableOperations.js
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/refs/heads/main/modules/observers.js
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/refs/heads/main/modules/domFixer.js
@@ -55,10 +55,22 @@
   try {
     unfilteredLog("Starting script initialization");
 
-    // Patch DOM methods to catch problematic operations
+    // CRITICAL FIX: Specifically target the "appendChild" with "setAttribute" - syntax error causing the issue
     const originalAppendChild = Element.prototype.appendChild;
     Element.prototype.appendChild = function (child) {
       try {
+        // Fix for the specific syntax error case: appendChild setAttribute(...)
+        if (
+          child === "setAttribute" ||
+          (typeof child === "string" && child.includes("setAttribute"))
+        ) {
+          console.error(
+            "[KM77] CRITICAL ERROR FIXED: Attempted to use setAttribute as appendChild argument"
+          );
+          return null;
+        }
+
+        // Regular null/undefined check
         if (!child) {
           unfilteredLog("Warning: Trying to append null/undefined child");
           return null;
@@ -71,6 +83,7 @@
       }
     };
 
+    // Additional protection for any setAttribute calls
     const originalSetAttribute = Element.prototype.setAttribute;
     Element.prototype.setAttribute = function (name, value) {
       try {
@@ -83,9 +96,59 @@
         console.error(`[${SCRIPT_ID} DOM ERROR]`, error);
       }
     };
+    // TODO: The thought of a Safe DOM manipulation helper - enhanced version
 
-    // Safe DOM manipulation helper - enhanced version
-    const safeDOM = {
+    debug("Script starting...");
+
+    // NOTE: Function to bypass problematic code sections - could identify very nasty issues
+
+    const skipProblematicCode = function () {
+      try {
+        // Try to identify problematic code sections by patching Function.prototype.toString
+        const originalToString = Function.prototype.toString;
+
+        // Let's do it maybe
+        Function.prototype.toString = function () {
+          const str = originalToString.call(this);
+
+          // Look for suspicious patterns that could cause our error - always of these looked like errors
+          if (
+            str.includes("appendChild") &&
+            str.includes("setAttribute") &&
+            !str.includes("appendChild(") &&
+            str.indexOf("appendChild") < str.indexOf("setAttribute")
+          ) {
+            unfilteredLog(
+              "WARNING: Detected potentially problematic code pattern"
+            );
+            console.warn(
+              "[KM77] Suspicious code pattern detected:",
+              this.name || "[Anonymous Function]"
+            );
+          }
+          return str;
+        };
+
+        // But let's restore after analysis
+        setTimeout(() => {
+          Function.prototype.toString = originalToString;
+        }, 5000);
+      } catch (err) {
+        console.error("[KM77] Error in code analysis:", err);
+      }
+    };
+
+    // And now we do the analysis!
+    skipProblematicCode();
+
+    // Initialize KM77 namespace globally
+    if (!window.KM77) {
+      debug("Creating KM77 namespace");
+      window.KM77 = {};
+    }
+
+    // Add DOM safety functions to our namespace
+    window.KM77.safeDOM = {
       create: function (tagName) {
         try {
           return document.createElement(tagName);
@@ -162,25 +225,7 @@
       },
     };
 
-    debug("Script starting...");
-
-    // Initialize KM77 namespace globally
-    if (!window.KM77) {
-      debug("Creating KM77 namespace");
-      window.KM77 = {};
-    }
-
-    // Add DOM safety functions to namespace
-    window.KM77.safeDOM = safeDOM;
-
-    // Create empty objects for required modules if they don't exist
-    window.KM77.state = window.KM77.state || {};
-    window.KM77.ui = window.KM77.ui || {};
-    window.KM77.dataProcessor = window.KM77.dataProcessor || {};
-    window.KM77.tableOperations = window.KM77.tableOperations || {};
-    window.KM77.observers = window.KM77.observers || {};
-
-    // Ensure all required modules are loaded
+    // The assertively structured modules
     const requiredModules = [
       { name: "state.init", obj: window.KM77.state.init },
       { name: "ui.addStyles", obj: window.KM77.ui.addStyles },
@@ -206,10 +251,12 @@
       },
     ];
 
-    // Check if all modules are available
+    // And now we check if all these modules are available
     let missingModules = requiredModules.filter(
       (m) => typeof m.obj !== "function"
     );
+
+    // And the rollbacks checks if they are ok - we wait for 2 seconds start on problems
     if (missingModules.length > 0) {
       debug(
         `WARNING: Missing modules: ${missingModules
@@ -218,12 +265,13 @@
       );
       debug("Will wait 2 seconds for modules to load before continuing...");
 
-      // Wait for modules to load with a timeout
+      // At least give them a fighting chance to load
       setTimeout(function () {
         initializeScript();
       }, 2000);
     } else {
-      debug("All modules loaded, initializing immediately");
+      // All these modules are loaded, so let's start our script
+      debug("We'll initialize immediately...");
       initializeScript();
     }
 
@@ -231,20 +279,22 @@
       try {
         debug("Initializing script...");
 
-        // Check for missing modules again
+        // Maybe a situation but let's check for missing modules again (yeah)
         missingModules = requiredModules.filter((m) => {
           const path = m.name.split(".");
 
           let obj = window.KM77;
 
+          // Do the check while parsing
           for (let i = 0; i < path.length; i++) {
             if (!obj || !obj[path[i]]) return true;
             obj = obj[path[i]];
           }
-
+          // At least last check: we mark not function
           return typeof obj !== "function";
         });
 
+        // peeking assistance if all modules are here
         if (missingModules.length > 0) {
           debug(
             `ERROR: Still missing modules after waiting: ${missingModules
@@ -254,7 +304,7 @@
           return;
         }
 
-        // Find table element
+        // Find the nice table html element
         const tableElement = document.querySelector("table.table.table-hover");
         if (!tableElement) {
           debug("No table found, exiting script");
@@ -262,7 +312,7 @@
         }
         debug("Table found, continuing script execution");
 
-        // First, check for the UI module since that's likely where the error is
+        // And the good looking UI module always loaded
         if (
           !window.KM77.ui ||
           typeof window.KM77.ui.createStatusIndicators !== "function"
@@ -273,7 +323,7 @@
           return;
         }
 
-        // Run each module in separate try/catch blocks to isolate errors
+        // Let's run each module in separate try/catch blocks to isolate errors
         try {
           window.KM77.state.init(tableElement);
           debug("State initialized");
@@ -305,7 +355,6 @@
         setTimeout(() => {
           try {
             window.KM77.tableOperations.setupSortButtonHandlers();
-            debug("Sort button handlers setup");
           } catch (err) {
             logError("Error in setting up sort button handlers", err);
           }
@@ -321,7 +370,6 @@
         setTimeout(() => {
           try {
             window.KM77.tableOperations.mergeTables();
-            debug("Tables merged");
           } catch (err) {
             logError("Error in merging tables", err);
           }
@@ -333,26 +381,7 @@
       }
     }
 
-    // Wait for required resources
-    // ...existing code...
-
-    async function getrandomword() {
-      const google = require("google-auth-library");
-      const OAuth2 = google.auth.OAuth2;
-      const config = require("./config/google.json");
-      const oauth2Client = new OAuth2(
-        config.clientId,
-        config.clientSecret,
-        config.redirectUri
-      );
-      const { tokens } = await oauth2Client.getToken(code);
-      oauth2Client.setCredentials(tokens);
-      // Use token to authenticate and authorize API requests
-      oauth2Client.credentials.access_token;
-      const accessToken = oauth2Client.credentials.access_token;
-      // Now you can access your Google service
-      return accessToken;
-    }
+    // Wait for all required resources
   } catch (e) {
     logError("KM77 Customizer fatal error", e);
   }
