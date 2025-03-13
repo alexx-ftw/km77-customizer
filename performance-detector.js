@@ -40,12 +40,19 @@ const KM77PerformanceDetector = (function () {
       }
     }
 
-    // Extract number of cylinders
+    // Extract number of cylinders with improved patterns
     let cylinders = null;
     const cylinderRegexes = [
+      // Pattern exactly matching the provided HTML structure
       /<tr>\s*<th[^>]*>\s*Número de cilindros\s*<\/th>\s*<td[^>]*>\s*(\d+)\s*<\/td>\s*<\/tr>/i,
-      /Número de cilindros[^<>]*<\/th>[\s\S]*?<td[^>]*>(\d+)/i,
+      // More flexible pattern for different column ordering
+      /<tr>(?:[^<]|<(?!\/tr))*?Número de cilindros(?:[^<]|<(?!\/th))*?<\/th>\s*<td[^>]*>\s*(\d+)\s*<\/td>/i,
+      // Even more flexible pattern
+      /Número de cilindros[^<>]*<\/th>[\s\S]*?<td[^>]*>\s*(\d+)/i,
+      // Alternative naming
       /Cilindros[^<]*<\/th>[^<]*<td[^>]*>([0-9]+)/i,
+      // Extra flexible pattern as last resort
+      /<th[^>]*>.*?[Cc]ilindros.*?<\/th>.*?<td[^>]*>([\d]+)/is,
     ];
 
     for (const regex of cylinderRegexes) {
@@ -54,6 +61,23 @@ const KM77PerformanceDetector = (function () {
         cylinders = match[1];
         console.log(`Found cylinder count: ${cylinders}`);
         break;
+      }
+    }
+
+    // If still no match, try a raw search for debugging
+    if (!cylinders) {
+      // Find any tr containing "Número de cilindros" or "Cilindros" for debugging
+      const rawCylinderMatch = content.match(
+        /<tr>(?:[^<]|<(?!\/tr))*?(?:Número de cilindros|Cilindros)(?:[^<]|<(?!\/tr))*?<\/tr>/i
+      );
+      if (rawCylinderMatch) {
+        console.log("Raw cylinder HTML found:", rawCylinderMatch[0]);
+        // Try a very permissive regex to extract just the number
+        const numMatch = rawCylinderMatch[0].match(/>(\d+)<\/td>/i);
+        if (numMatch) {
+          cylinders = numMatch[1];
+          console.log(`Extracted cylinders with fallback: ${cylinders}`);
+        }
       }
     }
 
