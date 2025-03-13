@@ -10,7 +10,11 @@
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/table-manager.js
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/speaker-detector.js
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/performance-detector.js
-// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/filter-manager.js?v=4
+// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/filter-core.js?v=1
+// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/speaker-filter.js?v=1
+// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/performance-filters.js?v=1
+// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/pagination-manager.js?v=1
+// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/filter-manager.js?v=6
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/ui-components.js?v=4
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/styles.js?v=1
 // @downloadUrl https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/km77-core.js
@@ -31,13 +35,19 @@
     mainTableBody: null,
 
     // Filter state - read from localStorage with defaults
-    currentFilterValue: parseInt(localStorage.getItem("km77SpeakerFilterValue")) || 6,
-    currentSpeedFilterValue: parseInt(localStorage.getItem("km77SpeedFilterValue")) || 0,
-    currentAccelFilterValue: parseFloat(localStorage.getItem("km77AccelFilterValue")) || 0,
-    filtersDisabled: localStorage.getItem("km77SpeakerFiltersDisabled") === "true",
-    speedFilterEnabled: localStorage.getItem("km77SpeedFilterEnabled") === "true",
-    accelFilterEnabled: localStorage.getItem("km77AccelFilterEnabled") === "true",
-    
+    currentFilterValue:
+      parseInt(localStorage.getItem("km77SpeakerFilterValue")) || 6,
+    currentSpeedFilterValue:
+      parseInt(localStorage.getItem("km77SpeedFilterValue")) || 0,
+    currentAccelFilterValue:
+      parseFloat(localStorage.getItem("km77AccelFilterValue")) || 0,
+    filtersDisabled:
+      localStorage.getItem("km77SpeakerFiltersDisabled") === "true",
+    speedFilterEnabled:
+      localStorage.getItem("km77SpeedFilterEnabled") === "true",
+    accelFilterEnabled:
+      localStorage.getItem("km77AccelFilterEnabled") === "true",
+
     isProcessing: false,
 
     // Processing tracking
@@ -150,7 +160,7 @@
 
     // Perform initial merge if there are multiple tables
     setTimeout(KM77TableManager.mergeTables, 500);
-    
+
     // Apply saved filters after tables are merged and processed
     setTimeout(KM77FilterManager.initializeFilters, 2000);
 
