@@ -51,18 +51,22 @@ const KM77UI = (function () {
 
   // Create master filter toggle button
   function createMasterFilterToggle() {
+    console.log("KM77 Customizer: Creating master filter toggle button");
+
     const masterToggleButton = document.createElement("button");
     masterToggleButton.id = "km77-master-filter-toggle";
     masterToggleButton.className = "btn btn-primary";
     masterToggleButton.style.cssText = `
       position: fixed;
-      top: 10px;
-      right: 10px;
-      z-index: 9999;
+      top: 70px;
+      right: 20px;
+      z-index: 10000;
       font-size: 14px;
-      padding: 5px 10px;
-      opacity: 0.9;
-      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+      padding: 8px 12px;
+      opacity: 0.95;
+      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.5);
+      border: 2px solid rgba(255, 255, 255, 0.5);
+      font-weight: bold;
     `;
 
     // Set button state based on localStorage
@@ -77,6 +81,21 @@ const KM77UI = (function () {
 
     document.body.appendChild(masterToggleButton);
     KM77.masterToggleButton = masterToggleButton;
+
+    console.log("KM77 Customizer: Master filter toggle button created");
+
+    // Add a failsafe to ensure the button is visible after a delay
+    setTimeout(() => {
+      if (masterToggleButton && !masterToggleButton.isConnected) {
+        console.log(
+          "KM77 Customizer: Re-appending master filter toggle button"
+        );
+        document.body.appendChild(masterToggleButton);
+      }
+
+      // Force button to be shown
+      masterToggleButton.style.display = "block";
+    }, 2000);
   }
 
   // Toggle all filters on/off
@@ -380,6 +399,11 @@ const KM77UI = (function () {
       button.textContent = "Disable All Filters";
       button.className = "btn btn-danger";
     }
+    console.log(
+      `KM77 Customizer: Master button state updated to ${
+        disabled ? "disabled" : "enabled"
+      }`
+    );
   }
 
   // Update filter status function
