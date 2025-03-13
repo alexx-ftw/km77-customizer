@@ -58,7 +58,7 @@ const KM77UI = (function () {
     masterToggleButton.className = "btn btn-primary";
     masterToggleButton.style.cssText = `
       position: fixed;
-      top: 120px;
+      top: 125px;
       right: 20px;
       z-index: 10000;
       font-size: 14px;
