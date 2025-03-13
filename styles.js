@@ -39,6 +39,15 @@ const KM77Styles = (function () {
         font-size: 12px;
         color: #333;
       }
+      
+      .slider-value.clickable {
+        cursor: pointer;
+        border-bottom: 1px dotted #007bff;
+      }
+      
+      .slider-value.clickable:hover {
+        color: #007bff;
+      }
 
       .speaker-filter button,
       .performance-filter button {

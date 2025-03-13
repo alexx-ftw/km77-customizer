@@ -144,9 +144,64 @@ const KM77FilterManager = (function () {
 
     // Create speed slider value display
     const numberDisplay = document.createElement("span");
-    numberDisplay.className = "slider-value";
+    numberDisplay.className = "slider-value clickable";
     numberDisplay.textContent = "OFF";
     numberDisplay.style.marginRight = "5px";
+    numberDisplay.title = "Click to edit";
+
+    // Make value display clickable for manual input
+    numberDisplay.addEventListener("click", () => {
+      if (numberDisplay.textContent === "OFF") return;
+
+      // Create input element
+      const inputElement = document.createElement("input");
+      inputElement.type = "number";
+      inputElement.min = slider.min;
+      inputElement.max = slider.max;
+      inputElement.step = slider.step;
+      inputElement.value = KM77.currentSpeedFilterValue || slider.value;
+      inputElement.style.width = "50px";
+      inputElement.style.marginRight = "5px";
+
+      // Replace display with input
+      numberDisplay.parentNode.replaceChild(inputElement, numberDisplay);
+      inputElement.focus();
+      inputElement.select();
+
+      // Handle input submission
+      const handleSubmit = () => {
+        let newValue = parseInt(inputElement.value);
+
+        // Validate value
+        newValue = Math.max(
+          parseInt(slider.min),
+          Math.min(parseInt(slider.max), newValue)
+        );
+
+        // Update slider and filter
+        slider.value = newValue;
+        KM77.currentSpeedFilterValue = newValue;
+        numberDisplay.textContent = `${newValue}+`;
+
+        // Replace input with display
+        inputElement.parentNode.replaceChild(numberDisplay, inputElement);
+
+        // Apply filter
+        applyFilters();
+      };
+
+      // Handle events
+      inputElement.addEventListener("blur", handleSubmit);
+      inputElement.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          handleSubmit();
+        }
+        if (e.key === "Escape") {
+          inputElement.parentNode.replaceChild(numberDisplay, inputElement);
+        }
+      });
+    });
 
     // Create speed filter slider
     const slider = document.createElement("input");
@@ -255,9 +310,65 @@ const KM77FilterManager = (function () {
 
     // Create acceleration slider value display
     const valueDisplay = document.createElement("span");
-    valueDisplay.className = "slider-value";
+    valueDisplay.className = "slider-value clickable";
     valueDisplay.textContent = "OFF";
     valueDisplay.style.marginRight = "5px";
+    valueDisplay.title = "Click to edit";
+
+    // Make value display clickable for manual input
+    valueDisplay.addEventListener("click", () => {
+      if (valueDisplay.textContent === "OFF") return;
+
+      // Create input element
+      const inputElement = document.createElement("input");
+      inputElement.type = "number";
+      inputElement.min = slider.min;
+      inputElement.max = slider.max;
+      inputElement.step = slider.step;
+      inputElement.value = KM77.currentAccelFilterValue || slider.value;
+      inputElement.style.width = "50px";
+      inputElement.style.marginRight = "5px";
+
+      // Replace display with input
+      valueDisplay.parentNode.replaceChild(inputElement, valueDisplay);
+      inputElement.focus();
+      inputElement.select();
+
+      // Handle input submission
+      const handleSubmit = () => {
+        let newValue = parseFloat(inputElement.value);
+
+        // Validate value
+        newValue = Math.max(
+          parseFloat(slider.min),
+          Math.min(parseFloat(slider.max), newValue)
+        );
+        newValue = newValue.toFixed(1); // Format to 1 decimal place
+
+        // Update slider and filter
+        slider.value = newValue;
+        KM77.currentAccelFilterValue = parseFloat(newValue);
+        valueDisplay.textContent = `${newValue}-`;
+
+        // Replace input with display
+        inputElement.parentNode.replaceChild(valueDisplay, inputElement);
+
+        // Apply filter
+        applyFilters();
+      };
+
+      // Handle events
+      inputElement.addEventListener("blur", handleSubmit);
+      inputElement.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          handleSubmit();
+        }
+        if (e.key === "Escape") {
+          inputElement.parentNode.replaceChild(valueDisplay, inputElement);
+        }
+      });
+    });
 
     // Create acceleration filter slider
     const slider = document.createElement("input");
@@ -361,9 +472,70 @@ const KM77FilterManager = (function () {
 
     // Create slider value display
     const sliderValueDisplay = document.createElement("span");
-    sliderValueDisplay.className = "slider-value";
+    sliderValueDisplay.className = "slider-value clickable";
     sliderValueDisplay.textContent = KM77.filtersDisabled ? "OFF" : "6+";
     sliderValueDisplay.style.marginRight = "5px";
+    sliderValueDisplay.title = "Click to edit";
+
+    // Make value display clickable for manual input
+    sliderValueDisplay.addEventListener("click", () => {
+      if (sliderValueDisplay.textContent === "OFF") return;
+
+      // Create input element
+      const inputElement = document.createElement("input");
+      inputElement.type = "number";
+      inputElement.min = filterSlider.min;
+      inputElement.max = filterSlider.max;
+      inputElement.step = filterSlider.step;
+      inputElement.value = KM77.currentFilterValue || filterSlider.value;
+      inputElement.style.width = "50px";
+      inputElement.style.marginRight = "5px";
+
+      // Replace display with input
+      sliderValueDisplay.parentNode.replaceChild(
+        inputElement,
+        sliderValueDisplay
+      );
+      inputElement.focus();
+      inputElement.select();
+
+      // Handle input submission
+      const handleSubmit = () => {
+        let newValue = parseInt(inputElement.value);
+
+        // Validate value
+        newValue = Math.max(
+          parseInt(filterSlider.min),
+          Math.min(parseInt(filterSlider.max), newValue)
+        );
+
+        // Update slider and filter
+        filterSlider.value = newValue;
+        KM77.currentFilterValue = newValue;
+        sliderValueDisplay.textContent = `${newValue}+`;
+
+        // Replace input with display
+        inputElement.parentNode.replaceChild(sliderValueDisplay, inputElement);
+
+        // Apply filter
+        applyFilters();
+      };
+
+      // Handle events
+      inputElement.addEventListener("blur", handleSubmit);
+      inputElement.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          handleSubmit();
+        }
+        if (e.key === "Escape") {
+          inputElement.parentNode.replaceChild(
+            sliderValueDisplay,
+            inputElement
+          );
+        }
+      });
+    });
 
     // Create decrease button
     const decreaseButton = document.createElement("button");
