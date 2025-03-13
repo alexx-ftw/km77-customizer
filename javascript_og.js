@@ -28,8 +28,12 @@
 
   // Store speaker data for filtering
   const speakerData = new Map();
-  // Track current filter value
+  // Store performance data
+  const performanceData = new Map();
+  // Track current filter values
   let currentFilterValue = 6;
+  let currentSpeedFilterValue = 0; // No filter by default
+  let currentAccelFilterValue = 0; // No filter by default
   // Track processed rows to avoid duplicates - now store both ID and index
   const processedRows = new Map();
   // Track if we're currently processing
@@ -38,14 +42,329 @@
   let filtersDisabled =
     localStorage.getItem("km77SpeakerFiltersDisabled") === "true";
 
-  // Add a new column to the table header
+  // Add columns to the table header - completely rewritten implementation
   function addSpeakerColumnToHeader(headerRow) {
-    if (!headerRow || headerRow.querySelector(".speaker-header")) {
-      return; // Already added or no header
+    if (!headerRow) {
+      console.error("KM77 Customizer: No header row provided");
+      return;
     }
 
-    const newHeader = document.createElement("th");
-    newHeader.className = "text-right speaker-header";
+    console.log("KM77 Customizer: Adding performance and speaker headers");
+
+    // First, check if our headers are already added
+    if (headerRow.querySelector(".speed-header")) {
+      console.log("KM77 Customizer: Headers already exist");
+      return;
+    }
+
+    // Force direct header insertion
+    try {
+      // Create speed header
+      const speedHeader = document.createElement("th");
+      speedHeader.className = "text-right speed-header";
+      speedHeader.innerHTML =
+        'Velocidad<br><span class="font-size-2xs font-weight-normal text-nowrap text-primary text-right">km/h</span>';
+      headerRow.appendChild(speedHeader);
+
+      // Create acceleration header
+      const accelHeader = document.createElement("th");
+      accelHeader.className = "text-right accel-header";
+      accelHeader.innerHTML =
+        'Aceleración<br><span class="font-size-2xs font-weight-normal text-nowrap text-primary text-right">0-100 km/h</span>';
+      headerRow.appendChild(accelHeader);
+
+      // Create speaker header
+      const speakerHeader = document.createElement("th");
+      speakerHeader.className = "text-right speaker-header";
+      speakerHeader.innerHTML =
+        'Altavoces<br><span class="font-size-2xs font-weight-normal text-nowrap text-primary text-right">Info</span>';
+      headerRow.appendChild(speakerHeader);
+
+      console.log("KM77 Customizer: Successfully added header columns");
+    } catch (e) {
+      console.error("KM77 Customizer: Error adding header columns", e);
+    }
+  }
+
+  // Initialize header columns when DOM content is loaded
+  document.addEventListener("DOMContentLoaded", function () {
+    console.log("KM77 Customizer: DOM content loaded, initializing headers");
+    initializeHeaders();
+  });
+
+  // Initialize headers function
+  function initializeHeaders() {
+    console.log("KM77 Customizer: Looking for header row");
+    const headerRow = document.querySelector(
+      "table.table.table-hover thead tr"
+    );
+    if (headerRow) {
+      addSpeakerColumnToHeader(headerRow);
+    } else {
+      console.warn("KM77 Customizer: Header row not found, will retry");
+      setTimeout(initializeHeaders, 500);
+    }
+  }
+
+  // Add a mutation observer to watch for header changes
+  const headerObserver = new MutationObserver(function (mutations) {
+    mutations.forEach(function (mutation) {
+      if (mutation.type === "childList") {
+        // Check if our table header exists
+        const headerRow = document.querySelector(
+          "table.table.table-hover thead tr"
+        );
+        if (headerRow && !headerRow.querySelector(".speed-header")) {
+          console.log(
+            "KM77 Customizer: Header detected via mutation, adding columns"
+          );
+          addSpeakerColumnToHeader(headerRow);
+        }
+      }
+    });
+  });
+
+  // Start observing the document with the configured parameters
+  headerObserver.observe(document.body, {
+    childList: true,
+    subtree: true,
+  });
+
+  // Also manually try to initialize on page load
+  window.addEventListener("load", function () {
+    console.log("KM77 Customizer: Window loaded, initializing headers");
+    initializeHeaders();
+
+    // Also try again after a short delay to catch any async table loading
+    setTimeout(initializeHeaders, 1000);
+  });
+
+  // Add a speed filter/remove the previously added speed filter
+  // Function to add speed filter controls
+  function addSpeedFilterControls(header) {
+    if (!header) return;
+
+    // Create speed filter UI
+    const filterContainer = document.createElement("div");
+    filterContainer.className = "performance-filter";
+    filterContainer.style.marginTop = "5px";
+
+    // Create speed slider value display
+    const numberDisplay = document.createElement("span");
+    numberDisplay.className = "slider-value";
+    numberDisplay.textContent = "OFF";
+    numberDisplay.style.marginRight = "5px";
+
+    // Create speed filter slider
+    const slider = document.createElement("input");
+    slider.type = "range";
+    slider.min = "100";
+    slider.max = "300";
+    slider.step = "10";
+    slider.value = "140"; // Default starting value
+    slider.style.width = "80px";
+    slider.style.marginRight = "5px";
+    slider.disabled = true;
+
+    // Create speed decrease button
+    const decreaseBtn = document.createElement("button");
+    decreaseBtn.textContent = "-";
+    decreaseBtn.className = "btn btn-sm btn-outline-secondary slider-button";
+    decreaseBtn.style.padding = "0px 5px";
+    decreaseBtn.style.marginRight = "3px";
+    decreaseBtn.disabled = true;
+
+    // Create speed increase button
+    const increaseBtn = document.createElement("button");
+    increaseBtn.textContent = "+";
+    increaseBtn.className = "btn btn-sm btn-outline-secondary slider-button";
+    increaseBtn.style.padding = "0px 5px";
+    increaseBtn.style.marginLeft = "3px";
+    increaseBtn.disabled = true;
+
+    // Create speed filter toggle button
+    const toggleBtn = document.createElement("button");
+    toggleBtn.textContent = "Filtrar";
+    toggleBtn.className = "btn btn-sm btn-success";
+    toggleBtn.style.marginLeft = "5px";
+
+    // Toggle speed filter functionality
+    toggleBtn.addEventListener("click", () => {
+      const isEnabled = slider.disabled === false;
+      slider.disabled = isEnabled;
+      decreaseBtn.disabled = isEnabled;
+      increaseBtn.disabled = isEnabled;
+
+      if (isEnabled) {
+        // Turning off
+        toggleBtn.textContent = "Filtrar";
+        toggleBtn.className = "btn btn-sm btn-success";
+        numberDisplay.textContent = "OFF";
+        currentSpeedFilterValue = 0;
+      } else {
+        // Turning on
+        toggleBtn.textContent = "Quitar";
+        toggleBtn.className = "btn btn-sm btn-danger";
+        numberDisplay.textContent = `${slider.value}+`;
+        currentSpeedFilterValue = parseInt(slider.value);
+      }
+      applyFilters();
+    });
+
+    // Update speed slider value display when moved
+    slider.addEventListener("input", () => {
+      numberDisplay.textContent = `${slider.value}+`;
+      currentSpeedFilterValue = parseInt(slider.value);
+      applyFilters();
+    });
+
+    // Decrease speed button functionality
+    decreaseBtn.addEventListener("click", () => {
+      const currentValue = parseInt(slider.value);
+      if (currentValue > parseInt(slider.min)) {
+        slider.value = currentValue - 10;
+        numberDisplay.textContent = `${slider.value}+`;
+        currentSpeedFilterValue = parseInt(slider.value);
+        applyFilters();
+      }
+    });
+
+    // Increase speed button functionality
+    increaseBtn.addEventListener("click", () => {
+      const currentValue = parseInt(slider.value);
+      if (currentValue < parseInt(slider.max)) {
+        slider.value = (currentValue + 10).toFixed(1);
+        numberDisplay.textContent = `${slider.value}+`;
+        currentSpeedFilterValue = parseInt(slider.value);
+        applyFilters();
+      }
+    });
+
+    // Add speed filter components
+    filterContainer.appendChild(numberDisplay);
+    filterContainer.appendChild(decreaseBtn);
+    filterContainer.appendChild(slider);
+    filterContainer.appendChild(increaseBtn);
+    filterContainer.appendChild(toggleBtn);
+    header.appendChild(filterContainer);
+
+    console.log("KM77 Customizer: Added speed filter controls");
+  }
+
+  // Function to add acceleration filter controls
+  function addAccelerationFilterControls(header) {
+    if (!header) return;
+
+    // Create acceleration filter UI
+    const filterContainer = document.createElement("div");
+    filterContainer.className = "performance-filter";
+    filterContainer.style.marginTop = "5px";
+
+    // Create acceleration slider value display
+    const valueDisplay = document.createElement("span");
+    valueDisplay.className = "slider-value";
+    valueDisplay.textContent = "OFF";
+    valueDisplay.style.marginRight = "5px";
+
+    // Create acceleration filter slider
+    const slider = document.createElement("input");
+    slider.type = "range";
+    slider.min = "3";
+    slider.max = "15";
+    slider.step = "0.5";
+    slider.value = "8"; // Default starting value
+    slider.style.width = "80px";
+    slider.style.marginRight = "5px";
+    slider.disabled = true;
+
+    // Create acceleration decrease button
+    const decreaseBtn = document.createElement("button");
+    decreaseBtn.textContent = "-";
+    decreaseBtn.className = "btn btn-sm btn-outline-secondary slider-button";
+    decreaseBtn.style.padding = "0px 5px";
+    decreaseBtn.style.marginRight = "3px";
+    decreaseBtn.disabled = true;
+
+    // Create acceleration increase button
+    const increaseBtn = document.createElement("button");
+    increaseBtn.textContent = "+";
+    increaseBtn.className = "btn btn-sm btn-outline-secondary slider-button";
+    increaseBtn.style.padding = "0px 5px";
+    increaseBtn.style.marginLeft = "3px";
+    increaseBtn.disabled = true;
+
+    // Create acceleration filter toggle button
+    const toggleBtn = document.createElement("button");
+    toggleBtn.textContent = "Filtrar";
+    toggleBtn.className = "btn btn-sm btn-success";
+    toggleBtn.style.marginLeft = "5px";
+
+    // Toggle acceleration filter functionality
+    toggleBtn.addEventListener("click", () => {
+      const isEnabled = slider.disabled === false;
+      slider.disabled = isEnabled;
+      decreaseBtn.disabled = isEnabled;
+      increaseBtn.disabled = isEnabled;
+
+      if (isEnabled) {
+        // Turning off
+        toggleBtn.textContent = "Filtrar";
+        toggleBtn.className = "btn btn-sm btn-success";
+        valueDisplay.textContent = "OFF";
+        currentAccelFilterValue = 0;
+      } else {
+        // Turning on
+        toggleBtn.textContent = "Quitar";
+        toggleBtn.className = "btn btn-sm btn-danger";
+        valueDisplay.textContent = `${slider.value}-`;
+        currentAccelFilterValue = parseFloat(slider.value);
+      }
+      applyFilters();
+    });
+
+    // Update acceleration slider value display when moved
+    slider.addEventListener("input", () => {
+      valueDisplay.textContent = `${slider.value}-`;
+      currentAccelFilterValue = parseFloat(slider.value);
+      applyFilters();
+    });
+
+    // Decrease acceleration button functionality
+    decreaseBtn.addEventListener("click", () => {
+      const currentValue = parseFloat(slider.value);
+      if (currentValue > parseFloat(slider.min)) {
+        slider.value = (currentValue - 0.5).toFixed(1);
+        valueDisplay.textContent = `${slider.value}-`;
+        currentAccelFilterValue = parseFloat(slider.value);
+        applyFilters();
+      }
+    });
+
+    // Increase acceleration button functionality
+    increaseBtn.addEventListener("click", () => {
+      const currentValue = parseFloat(slider.value);
+      if (currentValue < parseFloat(slider.max)) {
+        slider.value = (currentValue + 0.5).toFixed(1);
+        valueDisplay.textContent = `${slider.value}-`;
+        currentAccelFilterValue = parseFloat(slider.value);
+        applyFilters();
+      }
+    });
+
+    // Add acceleration filter components
+    filterContainer.appendChild(valueDisplay);
+    filterContainer.appendChild(decreaseBtn);
+    filterContainer.appendChild(slider);
+    filterContainer.appendChild(increaseBtn);
+    filterContainer.appendChild(toggleBtn);
+    header.appendChild(filterContainer);
+
+    console.log("KM77 Customizer: Added acceleration filter controls");
+  }
+
+  // Function to add speaker filter controls
+  function addSpeakerFilterControls(header) {
+    if (!header) return;
 
     // Create slider value display
     const sliderValueDisplay = document.createElement("span");
@@ -79,29 +398,32 @@
     increaseButton.style.marginLeft = "3px";
     if (filtersDisabled) increaseButton.disabled = true;
 
-    // Update the slider value display when slider is moved
+    // Add all the event listeners
     filterSlider.addEventListener("input", () => {
       sliderValueDisplay.textContent = `${filterSlider.value}+`;
-      applyFilter(filterSlider.value);
+      currentFilterValue = parseInt(filterSlider.value);
+      applyFilters();
     });
 
-    // Decrease button functionality
+    // Functionality of the decrease button
     decreaseButton.addEventListener("click", () => {
       const currentValue = parseInt(filterSlider.value);
       if (currentValue > parseInt(filterSlider.min)) {
         filterSlider.value = currentValue - 1;
         sliderValueDisplay.textContent = `${filterSlider.value}+`;
-        applyFilter(filterSlider.value);
+        currentFilterValue = parseInt(filterSlider.value);
+        applyFilters();
       }
     });
 
-    // Increase button functionality
+    // Functionality of the increase button
     increaseButton.addEventListener("click", () => {
       const currentValue = parseInt(filterSlider.value);
       if (currentValue < parseInt(filterSlider.max)) {
         filterSlider.value = currentValue + 1;
         sliderValueDisplay.textContent = `${filterSlider.value}+`;
-        applyFilter(filterSlider.value);
+        currentFilterValue = parseInt(filterSlider.value);
+        applyFilters();
       }
     });
 
@@ -117,10 +439,10 @@
       filterSlider.value = "0";
       sliderValueDisplay.textContent = "0+";
       currentFilterValue = 0;
-      applyFilter(null);
+      applyFilters();
     });
 
-    // Create toggle button to enable/disable filters
+    // Create toggle button for enabling/disabling filters
     const toggleButton = document.createElement("button");
     toggleButton.textContent = filtersDisabled
       ? "Enable Filters"
@@ -137,7 +459,7 @@
       // Save preference
       localStorage.setItem("km77SpeakerFiltersDisabled", filtersDisabled);
 
-      // Update UI
+      // Toggle button UI
       toggleButton.textContent = filtersDisabled
         ? "Enable Filters"
         : "Disable Filters";
@@ -155,123 +477,160 @@
         // If disabled, reset filtering
         sliderValueDisplay.textContent = "OFF";
         currentFilterValue = 0;
-        applyFilter(null);
+        applyFilters();
       } else {
         // If enabled, restore previous filter
         filterSlider.value = "6";
         sliderValueDisplay.textContent = "6+";
         currentFilterValue = 6;
-        applyFilter(6);
+        applyFilters();
       }
     });
 
-    // Create filter UI
-    const filterContainer = document.createElement("div");
-    filterContainer.className = "speaker-filter";
-    filterContainer.style.marginTop = "5px";
+    // Create filter UI container
+    const speakerFilterContainer = document.createElement("div");
+    speakerFilterContainer.className = "speaker-filter";
+    speakerFilterContainer.style.marginTop = "5px";
 
-    // Build the header content
-    newHeader.innerHTML =
-      'Altavoces<br><span class="font-size-2xs font-weight-normal text-nowrap text-primary text-right">Info</span>';
+    // Add all components to the container
+    speakerFilterContainer.appendChild(sliderValueDisplay);
+    speakerFilterContainer.appendChild(decreaseButton);
+    speakerFilterContainer.appendChild(filterSlider);
+    speakerFilterContainer.appendChild(increaseButton);
+    speakerFilterContainer.appendChild(resetButton);
+    speakerFilterContainer.appendChild(toggleButton);
 
-    // Add the filter UI
-    filterContainer.appendChild(sliderValueDisplay);
-    filterContainer.appendChild(decreaseButton);
-    filterContainer.appendChild(filterSlider);
-    filterContainer.appendChild(increaseButton);
-    filterContainer.appendChild(resetButton);
-    filterContainer.appendChild(toggleButton);
-    newHeader.appendChild(filterContainer);
-
-    headerRow.appendChild(newHeader);
-
-    // Apply initial filter after a short delay to allow rows to be processed
-    setTimeout(() => {
-      applyFilter(filtersDisabled ? null : 6); // Start with filter at 6 if not disabled
-    }, 500);
+    // Append the container to the header
+    header.appendChild(speakerFilterContainer);
   }
 
-  // Initial header setup
-  const headerRow = document.querySelector("table.table.table-hover thead tr");
-  if (headerRow) {
-    addSpeakerColumnToHeader(headerRow);
-  }
-
-  // Function to apply the filter
-  function applyFilter(minSpeakers) {
-    // If filters are disabled, show all rows and return
-    if (filtersDisabled) {
-      currentFilterValue = 0;
-
-      // Show all rows
-      const rows = mainTable.querySelectorAll("tbody tr.search");
-      rows.forEach((row) => {
-        row.style.display = "";
-      });
-
-      // Clear any filter status display
-      updateFilterStatus(0, 0);
-      return;
-    }
-
-    currentFilterValue = minSpeakers || 0;
-    // Get all rows from the main table only (now that we're merging all tables)
+  // Function to apply all filters together
+  function applyFilters() {
+    // Get all rows from the main table
     const rows = mainTable.querySelectorAll("tbody tr.search");
     let hiddenCount = 0;
 
     rows.forEach((row) => {
       const carId = row.getAttribute("data-nql");
-      const speakerCount = speakerData.get(carId);
 
-      if (minSpeakers && minSpeakers > 0) {
-        // Only hide rows with a specific speaker count below minimum
-        // Empty/dash values (null, "-", "0") will always be shown
+      // Check if row should be visible based on all active filters
+      let showRow = true;
+
+      // Apply speaker filter if active
+      if (!filtersDisabled && currentFilterValue > 0) {
+        const speakerCount = speakerData.get(carId);
+        const allConfigs = speakerData.get(carId + "_all");
         const numSpeakers = parseInt(speakerCount) || 0;
 
-        if (numSpeakers > 0 && numSpeakers < parseInt(minSpeakers)) {
-          row.style.display = "none";
-          hiddenCount++;
-        } else {
-          row.style.display = "";
+        let speakerVisible =
+          numSpeakers === 0 || numSpeakers >= parseInt(currentFilterValue);
+
+        // Check detailed configurations if available
+        if (allConfigs && Array.isArray(allConfigs)) {
+          speakerVisible = allConfigs.some(
+            (config) => config.count >= parseInt(currentFilterValue)
+          );
         }
+
+        // If speaker filter fails, hide the row
+        if (!speakerVisible) {
+          showRow = false;
+        }
+      }
+
+      // Apply speed filter if active
+      if (showRow && currentSpeedFilterValue > 0) {
+        const perfData = performanceData.get(carId);
+        if (perfData && perfData.maxSpeed) {
+          const speed = parseInt(perfData.maxSpeed) || 0;
+          if (speed > 0 && speed < currentSpeedFilterValue) {
+            showRow = false;
+          }
+        }
+      }
+
+      // Apply acceleration filter if active
+      if (showRow && currentAccelFilterValue > 0) {
+        const perfData = performanceData.get(carId);
+        if (perfData && perfData.acceleration) {
+          // Convert acceleration to float, handling commas if needed
+          const accelStr = perfData.acceleration.replace(",", ".");
+          const accel = parseFloat(accelStr) || 0;
+          if (accel > 0 && accel > currentAccelFilterValue) {
+            showRow = false;
+          }
+        }
+      }
+
+      // Show or hide row based on filter status
+      if (!showRow) {
+        row.style.display = "none";
+        hiddenCount++;
       } else {
-        // Show all rows when filter is reset
         row.style.display = "";
       }
     });
 
-    // Update the filter status
+    // Update filter status
     updateFilterStatus(hiddenCount, rows.length);
   }
 
   // Function to apply filter to a single row
-  function applyFilterToRow(row, minSpeakers) {
-    // If filters are disabled, always show the row
-    if (filtersDisabled) {
-      row.style.display = "";
-      return;
-    }
-
+  function applyFilterToRow(row, speakerMinValue) {
+    // Check all active filters for this single row
     const carId = row.getAttribute("data-nql");
-    const speakerCount = speakerData.get(carId);
-    const allConfigs = speakerData.get(carId + "_all");
 
-    if (minSpeakers && minSpeakers > 0) {
+    // Start assuming the row should be visible
+    let showRow = true;
+
+    // Apply speaker filter if active
+    if (!filtersDisabled && speakerMinValue > 0) {
+      const speakerCount = speakerData.get(carId);
+      const allConfigs = speakerData.get(carId + "_all");
       const numSpeakers = parseInt(speakerCount) || 0;
-      let showRow = numSpeakers === 0 || numSpeakers >= parseInt(minSpeakers);
 
-      // If we have detailed configurations, check if any option meets criteria
+      let speakerVisible =
+        numSpeakers === 0 || numSpeakers >= parseInt(speakerMinValue);
+
+      // Check detailed configurations if available
       if (allConfigs && Array.isArray(allConfigs)) {
-        // Show if any configuration meets the minimum speakers
-        showRow = allConfigs.some(
-          (config) => config.count >= parseInt(minSpeakers)
+        speakerVisible = allConfigs.some(
+          (config) => config.count >= parseInt(speakerMinValue)
         );
       }
 
-      row.style.display = showRow ? "" : "none";
-    } else {
-      row.style.display = "";
+      // If speaker filter fails, hide the row
+      if (!speakerVisible) {
+        showRow = false;
+      }
     }
+
+    // Apply speed filter if active
+    if (showRow && currentSpeedFilterValue > 0) {
+      const perfData = performanceData.get(carId);
+      if (perfData && perfData.maxSpeed) {
+        const speed = parseInt(perfData.maxSpeed) || 0;
+        if (speed > 0 && speed < currentSpeedFilterValue) {
+          showRow = false;
+        }
+      }
+    }
+
+    // Apply acceleration filter if active
+    if (showRow && currentAccelFilterValue > 0) {
+      const perfData = performanceData.get(carId);
+      if (perfData && perfData.acceleration) {
+        // Convert acceleration to float, handling commas if needed
+        const accelStr = perfData.acceleration.replace(",", ".");
+        const accel = parseFloat(accelStr) || 0;
+        if (accel > 0 && accel > currentAccelFilterValue) {
+          showRow = false;
+        }
+      }
+    }
+
+    // Show or hide row based on filter status
+    row.style.display = showRow ? "" : "none";
   }
 
   // Process a single car row
@@ -288,21 +647,43 @@
     // Mark this specific row as processed
     processedRows.set(rowId, true);
 
+    // Add a new cell for top speed info
+    let speedCell;
+    const speedLastCell = row.querySelector("td.speed-cell");
+    if (speedLastCell) {
+      speedCell = speedLastCell;
+    } else {
+      // Create a new cell
+      speedCell = document.createElement("td");
+      speedCell.style.textAlign = "right";
+      speedCell.className = "align-middle speed-cell";
+      speedCell.innerHTML = '<span class="loading">Cargando...</span>';
+      row.appendChild(speedCell);
+    }
+
+    // Add a new cell for acceleration info
+    let accelCell;
+    const accelLastCell = row.querySelector("td.accel-cell");
+    if (accelLastCell) {
+      accelCell = accelLastCell;
+    } else {
+      // Create a new cell
+      accelCell = document.createElement("td");
+      accelCell.style.textAlign = "right";
+      accelCell.className = "align-middle accel-cell";
+      accelCell.innerHTML = '<span class="loading">Cargando...</span>';
+      row.appendChild(accelCell);
+    }
+
     // Add a new cell for speakers info
     let speakersCell;
-
-    // Check if already has a speakers cell (last cell)
-    const lastCell = row.querySelector("td:last-child");
-    if (
-      lastCell &&
-      lastCell.className.includes("align-middle") &&
-      lastCell?.classList.contains("speaker-cell")
-    ) {
+    const lastCell = row.querySelector("td.speaker-cell");
+    if (lastCell) {
       speakersCell = lastCell;
     } else {
       // Create a new cell
       speakersCell = document.createElement("td");
-      speakersCell.style.textAlign = "right"; // Replace deprecated align attribute
+      speakersCell.style.textAlign = "right";
       speakersCell.className = "align-middle speaker-cell";
       speakersCell.innerHTML = '<span class="loading">Cargando...</span>';
       row.appendChild(speakersCell);
@@ -312,7 +693,10 @@
     const carLink = row.querySelector("td.vehicle-name a.d-block");
     if (!carLink) {
       speakersCell.innerHTML = "Error";
+      speedCell.innerHTML = "Error";
+      accelCell.innerHTML = "Error";
       speakerData.set(carId, null);
+      performanceData.set(carId, null);
       updateStatus(
         ++processedCount,
         mainTable.querySelectorAll("tbody tr.search").length
@@ -320,219 +704,74 @@
       return;
     }
 
-    // Get the car details URL and convert it to equipment URL
+    // Get the car details URL
     let carDetailsUrl = carLink.getAttribute("href");
-    // Replace /datos with /datos/equipamiento
-    const equipmentUrl = carDetailsUrl.replace("/datos", "/datos/equipamiento");
 
-    // Use GM_xmlhttpRequest to fetch the equipment page
+    // Make a single request to the main car details page
     GM_xmlhttpRequest({
       method: "GET",
-      url: `https://www.km77.com${equipmentUrl}`,
+      url: `https://www.km77.com${carDetailsUrl}`,
       onload: function (response) {
         const content = response.responseText;
 
-        // Store all speaker configurations found
-        const speakerConfigurations = [];
+        // Process performance data
+        processPerformanceData(content, carId, speedCell, accelCell);
 
-        // Track speaker references by description to avoid duplicates
-        const processedDescriptions = new Set();
+        // Check if we need to make an additional request for equipment data
+        if (
+          content.includes("equipamiento") &&
+          !content.match(/[aA]ltavoces/i)
+        ) {
+          // If the main page doesn't contain speaker info but has a link to equipment page,
+          // make a second request just for speakers
+          const equipmentUrl = carDetailsUrl.replace(
+            "/datos",
+            "/datos/equipamiento"
+          );
 
-        // First pass: Look for table rows that contain multiple speaker references in the same item
-        const tableRowRegex = /<tr[^>]*>.*?<th[^>]*>(.*?)<\/th>.*?<\/tr>/gs;
-        let tableRowMatch;
-
-        while ((tableRowMatch = tableRowRegex.exec(content)) !== null) {
-          const rowText = tableRowMatch[1];
-
-          // Skip if we don't have speaker references
-          if (!rowText.match(/[aA]ltavoces/)) continue;
-
-          // Check if this is a combined speaker system (multiple speaker references in one row)
-          const regExp = /(\d+)\s*[aA]ltavoces/g;
-          let speakerMatch;
-          const speakerMatches = [];
-
-          while ((speakerMatch = regExp.exec(rowText)) !== null) {
-            speakerMatches.push(speakerMatch);
-          }
-
-          if (speakerMatches.length > 1) {
-            // We found multiple speaker references in one description - combine them
-            let totalSpeakers = 0;
-            speakerMatches.forEach((match) => {
-              totalSpeakers += parseInt(match[1]);
-            });
-
-            // Add as a combined configuration
-            speakerConfigurations.push({
-              text: rowText.trim(),
-              count: totalSpeakers,
-              isMultipleSum: true,
-              originalDescription: rowText.trim(),
-            });
-
-            // Add to processed set to avoid duplicates
-            processedDescriptions.add(rowText.trim());
-
-            console.log(
-              `Found combined speakers: ${totalSpeakers} total from: ${rowText.trim()}`
-            );
-          }
-        }
-
-        // Second pass: Look for individual speaker patterns
-        const speakerRegexes = [
-          // Match "X altavoces" with optional details in parentheses
-          /(\d+)\s*[aA]ltavoces(?:\s*\([^)]*\))?/g,
-          // Match "Sonido/Sistema... X altavoces" patterns
-          /[sS]onido.*?(\d+)\s*[aA]ltavoces/g,
-          /[sS]istema.*?(\d+)\s*[aA]ltavoces/g,
-          // Match "X canales... Y altavoces" (in same phrase)
-          /\d+\s*canales.*?(\d+)\s*[aA]ltavoces/g,
-          // Match cases where "altavoces" appears first followed by a number
-          /[aA]ltavoces[:\s]*(\d+)(?:\s*\([^)]*\))?/g,
-        ];
-
-        // Extract speaker contexts - get surrounding text for context
-        const speakerContexts = [];
-        const contextRegex =
-          /<tr[^>]*>.*?<th[^>]*>(.*?)<\/th>.*?<td[^>]*>(.*?)<\/td>.*?<\/tr>/gs;
-        let contextMatch;
-
-        while ((contextMatch = contextRegex.exec(content)) !== null) {
-          const description = contextMatch[1].trim();
-          const status = contextMatch[2].trim();
-
-          // Only process if it mentions speakers and we haven't already processed it
-          if (
-            description.match(/[aA]ltavoces/) &&
-            !processedDescriptions.has(description)
-          ) {
-            speakerContexts.push({
-              description,
-              status,
-            });
-          }
-        }
-
-        // Process each context to extract speaker counts
-        speakerContexts.forEach((context) => {
-          // Find all speaker counts in this context
-          for (const regex of speakerRegexes) {
-            regex.lastIndex = 0; // Reset regex state
-            let match;
-            while ((match = regex.exec(context.description)) !== null) {
-              const count = parseInt(match[1]);
-              if (!isNaN(count) && count > 0) {
-                // Skip if it's part of a description we already processed
-                if (processedDescriptions.has(context.description)) continue;
-
-                // Add the configuration
-                speakerConfigurations.push({
-                  text: `${context.description} (${context.status})`,
-                  count: count,
-                  originalDescription: context.description,
-                });
-
-                processedDescriptions.add(context.description);
-                break; // We found a match for this context, move to next
-              }
-            }
-          }
-        });
-
-        // Remove duplicate configurations and consolidate
-        const uniqueConfigs = [];
-        const seenCounts = new Set();
-
-        // First add combined configurations (they take priority)
-        speakerConfigurations
-          .filter((config) => config.isMultipleSum)
-          .forEach((config) => {
-            uniqueConfigs.push(config);
-            seenCounts.add(config.count);
+          GM_xmlhttpRequest({
+            method: "GET",
+            url: `https://www.km77.com${equipmentUrl}`,
+            onload: function (eqResponse) {
+              processSpeakerData(
+                eqResponse.responseText,
+                carId,
+                speakersCell,
+                row
+              );
+              updateStatus(
+                ++processedCount,
+                mainTable.querySelectorAll("tbody tr.search").length
+              );
+            },
+            onerror: function (error) {
+              console.error(
+                `Error fetching equipment data for ${carId}: ${error}`
+              );
+              speakersCell.innerHTML = "Error";
+              speakerData.set(carId, null);
+              updateStatus(
+                ++processedCount,
+                mainTable.querySelectorAll("tbody tr.search").length
+              );
+            },
           });
-
-        // Then add other configurations if their count hasn't been seen
-        speakerConfigurations
-          .filter((config) => !config.isMultipleSum)
-          .sort((a, b) => b.count - a.count) // Sort by count descending
-          .forEach((config) => {
-            if (!seenCounts.has(config.count)) {
-              uniqueConfigs.push(config);
-              seenCounts.add(config.count);
-            }
-          });
-
-        // Try old patterns as fallback if we found nothing
-        if (uniqueConfigs.length === 0) {
-          // Try old specific patterns as fallback
-          const oldPatterns = [
-            /6\s*[aA]ltavoces(?:\s*\([^)]*\))?/i,
-            /[aA]ltavoces[:\s]*6(?:\s*\([^)]*\))?/i,
-            /[aA]ltavoces[^<>]*?6/i,
-            /6[^<>]*?[aA]ltavoces/i,
-            /[sS]istema.*?[aA]udio.*?6/i,
-            /[eE]quipo.*?[aA]udio.*?6/i,
-          ];
-
-          for (const pattern of oldPatterns) {
-            const match = content.match(pattern);
-            if (match) {
-              uniqueConfigs.push({
-                text: match[0].trim(),
-                count: 6,
-              });
-              break;
-            }
-          }
-        }
-
-        // Update the cell with consolidated configurations
-        if (uniqueConfigs.length > 0) {
-          // Create display text showing all configurations
-          const displayItems = uniqueConfigs.map((config) => {
-            // For summed speaker counts, show the sum with a special indicator
-            if (config.isMultipleSum) {
-              return `<div title="${config.text}" class="combined-speakers">${config.count}*</div>`;
-            }
-            return `<div title="${config.text}">${config.count}</div>`;
-          });
-
-          speakersCell.innerHTML = displayItems.join("");
-          speakersCell.style.color = "green";
-          speakersCell.style.fontWeight = "bold";
-
-          // Store the highest speaker count for filtering
-          const maxSpeakers = Math.max(...uniqueConfigs.map((c) => c.count));
-          speakerData.set(carId, maxSpeakers.toString());
-
-          // Store all configurations for advanced filtering
-          speakerData.set(carId + "_all", uniqueConfigs);
         } else {
-          speakersCell.innerHTML = "-";
-          speakerData.set(carId, "0");
-          // Also check if "altavoces" appears at all
-          if (content.match(/[aA]ltavoces/i)) {
-            speakersCell.title =
-              "Mentions altavoces but couldn't determine count";
-            speakersCell.style.color = "orange";
-          }
+          // Try to extract speaker data from the main page
+          processSpeakerData(content, carId, speakersCell, row);
+          updateStatus(
+            ++processedCount,
+            mainTable.querySelectorAll("tbody tr.search").length
+          );
         }
-
-        // Apply current filter to this row
-        applyFilterToRow(row, currentFilterValue);
-
-        updateStatus(
-          ++processedCount,
-          mainTable.querySelectorAll("tbody tr.search").length
-        );
       },
       onerror: function (error) {
         console.error(`Error fetching data for ${carId}: ${error}`);
         speakersCell.innerHTML = "Error";
+        speedCell.innerHTML = "Error";
+        accelCell.innerHTML = "Error";
         speakerData.set(carId, null);
+        performanceData.set(carId, null);
         updateStatus(
           ++processedCount,
           mainTable.querySelectorAll("tbody tr.search").length
@@ -541,13 +780,301 @@
       ontimeout: function () {
         console.warn(`Timeout fetching data for ${carId}`);
         speakersCell.innerHTML = "Timeout";
+        speedCell.innerHTML = "Timeout";
+        accelCell.innerHTML = "Timeout";
         speakerData.set(carId, null);
+        performanceData.set(carId, null);
         updateStatus(
           ++processedCount,
           mainTable.querySelectorAll("tbody tr.search").length
         );
       },
     });
+  }
+
+  // Function to extract performance data
+  function processPerformanceData(content, carId, speedCell, accelCell) {
+    // Extract maximum speed with improved patterns matching the actual HTML structure
+    let maxSpeed = null;
+    const maxSpeedRegexes = [
+      /<tr>\s*<th[^>]*>\s*Velocidad máxima\s*<\/th>\s*<td[^>]*>\s*(\d+)\s*km\/h\s*<\/td>\s*<\/tr>/i,
+      /Velocidad máxima[^<>]*<\/th>[\s\S]*?<td[^>]*>(\d+)\s*km\/h/i,
+      /Velocidad máxima[^<]*<\/th>[^<]*<td[^>]*>([0-9]+)[^<]*km\/h/i,
+    ];
+
+    for (const regex of maxSpeedRegexes) {
+      const match = content.match(regex);
+      if (match) {
+        maxSpeed = match[1];
+        console.log(`Found max speed: ${maxSpeed} km/h`);
+        break;
+      }
+    }
+
+    // Extract acceleration with improved patterns
+    let acceleration = null;
+    const accelRegexes = [
+      /<tr>\s*<th[^>]*>\s*Aceleración 0-100 km\/h\s*<\/th>\s*<td[^>]*>\s*([0-9,.]+)\s*s\s*<\/td>\s*<\/tr>/i,
+      /Aceleración 0-100 km\/h[^<>]*<\/th>[\s\S]*?<td[^>]*>([\d,.]+)\s*s/i,
+      /Aceleración 0-100 km\/h[^<]*<\/th>[^<]*<td[^>]*>([0-9,.]+)[^<]*s/i,
+    ];
+
+    for (const regex of accelRegexes) {
+      const match = content.match(regex);
+      if (match) {
+        acceleration = match[1];
+        console.log(`Found acceleration: ${acceleration}s`);
+        break;
+      }
+    }
+
+    // Try raw search as last resort
+    if (!maxSpeed) {
+      // Find any tr containing "Velocidad máxima" for debugging
+      const rawSpeedMatch = content.match(
+        /<tr>[\s\S]*?Velocidad máxima[\s\S]*?<\/tr>/i
+      );
+      if (rawSpeedMatch) {
+        console.log("Raw speed HTML found:", rawSpeedMatch[0]);
+        // Try a very permissive regex to extract just the number
+        const numMatch = rawSpeedMatch[0].match(/(\d+)\s*km\/h/i);
+        if (numMatch) {
+          maxSpeed = numMatch[1];
+          console.log(`Extracted max speed with fallback: ${maxSpeed} km/h`);
+        }
+      }
+    }
+
+    if (!acceleration) {
+      // Find any tr containing "Aceleración" for debugging
+      const rawAccelMatch = content.match(
+        /<tr>[\s\S]*?Aceleración 0-100 km\/h[\s\S]*?<\/tr>/i
+      );
+      if (rawAccelMatch) {
+        console.log("Raw acceleration HTML found:", rawAccelMatch[0]);
+        // Try a very permissive regex to extract just the number
+        const numMatch = rawAccelMatch[0].match(/([\d,.]+)\s*s/i);
+        if (numMatch) {
+          acceleration = numMatch[1];
+          console.log(`Extracted acceleration with fallback: ${acceleration}s`);
+        }
+      }
+    }
+
+    // Handle max speed display
+    if (maxSpeed) {
+      const formattedValue = `${maxSpeed}`;
+      speedCell.innerHTML = formattedValue;
+      speedCell.style.color = "#0066cc";
+      speedCell.style.fontWeight = "bold";
+    } else {
+      speedCell.innerHTML = "-";
+    }
+
+    // Handle acceleration display
+    if (acceleration) {
+      const formattedValue = `${acceleration}`;
+      accelCell.innerHTML = formattedValue;
+      accelCell.style.color = "#0066cc";
+      accelCell.style.fontWeight = "bold";
+    } else {
+      accelCell.innerHTML = "-";
+    }
+
+    // Store the performance data
+    performanceData.set(carId, {
+      maxSpeed: maxSpeed || "-",
+      acceleration: acceleration || "-",
+    });
+  }
+
+  // Function to extract speaker data
+  function processSpeakerData(content, carId, cell, row) {
+    // Store all speaker configurations found
+    const speakerConfigurations = [];
+
+    // Track speaker references by description to avoid duplicates
+    const processedDescriptions = new Set();
+
+    // First pass: Look for table rows that contain multiple speaker references in the same item
+    const tableRowRegex = /<tr[^>]*>.*?<th[^>]*>(.*?)<\/th>.*?<\/tr>/gs;
+    let tableRowMatch;
+
+    while ((tableRowMatch = tableRowRegex.exec(content)) !== null) {
+      const rowText = tableRowMatch[1];
+
+      // Skip if we don't have speaker references
+      if (!rowText.match(/[aA]ltavoces/)) continue;
+
+      // Check if this is a combined speaker system (multiple speaker references in one row)
+      const regExp = /(\d+)\s*[aA]ltavoces/g;
+      let speakerMatch;
+      const speakerMatches = [];
+
+      while ((speakerMatch = regExp.exec(rowText)) !== null) {
+        speakerMatches.push(speakerMatch);
+      }
+
+      if (speakerMatches.length > 1) {
+        // We found multiple speaker references in one description - combine them
+        let totalSpeakers = 0;
+
+        speakerMatches.forEach((match) => {
+          totalSpeakers += parseInt(match[1]);
+        });
+
+        // Add as a combined configuration
+        speakerConfigurations.push({
+          text: rowText.trim(),
+          count: totalSpeakers,
+          isMultipleSum: true,
+          originalDescription: rowText.trim(),
+        });
+
+        // Add to processed set to avoid duplicates
+        processedDescriptions.add(rowText.trim());
+      }
+    }
+
+    // Second pass: Look for individual speaker patterns
+    const speakerRegexes = [
+      // Match "X altavoces" with optional details in parentheses
+      /(\d+)\s*[aA]ltavoces(?:\s*\([^)]*\))?/g,
+      // Match "Sonido/Sistema... X altavoces" patterns
+      /[sS]onido.*?(\d+)\s*[aA]ltavoces/g,
+      /[sS]istema.*?(\d+)\s*[aA]ltavoces/g,
+      // Match "X canales... Y altavoces" (in same phrase)
+      /\d+\s*canales.*?(\d+)\s*[aA]ltavoces/g,
+      // Match cases where "altavoces" appears first followed by a number
+      /[aA]ltavoces[:\s]*(\d+)(?:\s*\([^)]*\))?/g,
+    ];
+
+    // Extract speaker contexts - get surrounding text for context
+    const speakerContexts = [];
+    const contextRegex =
+      /<tr[^>]*>.*?<th[^>]*>(.*?)<\/th>.*?<td[^>]*>(.*?)<\/td>.*?<\/tr>/gs;
+    let contextMatch;
+
+    while ((contextMatch = contextRegex.exec(content)) !== null) {
+      const description = contextMatch[1].trim();
+      const status = contextMatch[2].trim();
+
+      // Only process if it mentions speakers and we haven't already processed it
+      if (
+        description.match(/[aA]ltavoces/) &&
+        !processedDescriptions.has(description)
+      ) {
+        speakerContexts.push({
+          description,
+          status,
+        });
+      }
+    }
+
+    // Process each context
+    speakerContexts.forEach((context) => {
+      // Find all speaker counts in this context
+      for (const regex of speakerRegexes) {
+        regex.lastIndex = 0; // Reset regex state
+        let match;
+        while ((match = regex.exec(context.description)) !== null) {
+          const count = parseInt(match[1]);
+          if (!isNaN(count) && count > 0) {
+            // Skip if it's part of a description we already processed
+            if (processedDescriptions.has(context.description)) continue;
+
+            // Add the configuration
+            speakerConfigurations.push({
+              text: `${context.description} (${context.status})`,
+              count: count,
+              originalDescription: context.description,
+            });
+
+            processedDescriptions.add(context.description);
+            break; // We found a match for this context, move to next
+          }
+        }
+      }
+    });
+
+    // Remove duplicate configurations and consolidate
+    const uniqueConfigs = [];
+    const seenCounts = new Set();
+
+    // First add combined configurations (they take priority)
+    speakerConfigurations
+      .filter((config) => config.isMultipleSum)
+      .forEach((config) => {
+        uniqueConfigs.push(config);
+        seenCounts.add(config.count);
+      });
+
+    // Then add other configurations if their count hasn't been seen
+    speakerConfigurations
+      .filter((config) => !config.isMultipleSum)
+      .sort((a, b) => b.count - a.count) // Sort by count descending
+      .forEach((config) => {
+        if (!seenCounts.has(config.count)) {
+          uniqueConfigs.push(config);
+          seenCounts.add(config.count);
+        }
+      });
+
+    // Resort to old patterns if we found nothing
+    if (uniqueConfigs.length === 0) {
+      const oldPatterns = [
+        /6\s*[aA]ltavoces(?:\s*\([^)]*\))?/i,
+        /[aA]ltavoces[:\s]*6(?:\s*\([^)]*\))?/i,
+        /[aA]ltavoces[^<>]*?6/i,
+        /6[^<>]*?[aA]ltavoces/i,
+        /[sS]istema.*?[aA]udio.*?6/i,
+        /[eE]quipo.*?[aA]udio.*?6/i,
+      ];
+
+      for (const pattern of oldPatterns) {
+        const match = content.match(pattern);
+        if (match) {
+          uniqueConfigs.push({
+            text: match[0].trim(),
+            count: 6,
+          });
+          break;
+        }
+      }
+    }
+
+    // Update the cell with consolidated configurations
+    if (uniqueConfigs.length > 0) {
+      // Format display text showing all combined configurations
+      const displayItems = uniqueConfigs.map((config) => {
+        if (config.isMultipleSum) {
+          return `<div title="${config.text}" class="combined-speakers">${config.count}*</div>`;
+        }
+        return `<div title="${config.text}">${config.count}</div>`;
+      });
+
+      cell.innerHTML = displayItems.join("");
+      cell.style.color = "green";
+      cell.style.fontWeight = "bold";
+
+      // Store the highest speaker count for filtering
+      const maxSpeakers = Math.max(...uniqueConfigs.map((c) => c.count));
+      // Store separately all configurations for advanced filtering
+      speakerData.set(carId + "_all", uniqueConfigs);
+      // Also store the maximum value for filtering
+      speakerData.set(carId, maxSpeakers.toString());
+    } else {
+      cell.innerHTML = "-";
+      speakerData.set(carId, "0");
+      // If no speaker count and no custom pattern found
+      if (content.match(/[aA]ltavoces/i)) {
+        cell.title = "Mentions altavoces but couldn't determine count";
+        cell.style.color = "orange";
+      }
+    }
+
+    // Finally apply current filter to row
+    applyFilterToRow(row, currentFilterValue);
   }
 
   // Process all existing car rows
@@ -633,7 +1160,6 @@
         tableToMerge.style.display = "none";
       }
     }
-
     // Reset processed rows tracking when merging tables
     // This forces re-processing rows that might be duplicates from different tables
     processedRows.clear();
@@ -681,7 +1207,7 @@
           }
         });
 
-        // Instead of clicking, implement our own sorting
+        // Sort table manually
         manuallyApplySort(sortColumnSelector, sortOrder);
       }
     }
@@ -694,7 +1220,6 @@
   function manuallyApplySort(sortField, direction) {
     const rows = Array.from(mainTableBody.querySelectorAll("tr.search"));
     if (rows.length <= 1) return; // Nothing to sort
-
     console.log(`Manually sorting by ${sortField} in ${direction} order`);
 
     // Sort the array of rows
@@ -820,7 +1345,7 @@
             }
           });
 
-          // Apply the sort
+          // Apply sorting
           manuallyApplySort(sortField, newDirection);
 
           return false; // Ensure no further action happens
@@ -835,38 +1360,18 @@
     setupSortButtonHandlers();
   }, 1000); // Small delay to ensure all elements are loaded
 
-  let processedCount = 0;
   processExistingRows();
 
   // Create status indicator
   const statusDiv = document.createElement("div");
   statusDiv.id = "km77-status";
-  statusDiv.style.cssText = `
-        position: fixed;
-        bottom: 20px;
-        right: 20px;
-        background: #fff;
-        border: 1px solid #ddd;
-        padding: 10px;
-        box-shadow: 0 0 10px rgba(0,0,0,0.2);
-        z-index: 9999;
-    `;
+  statusDiv.style.cssText = `fill: #fff`;
   document.body.appendChild(statusDiv);
 
   // Create filter status indicator
   const filterStatusDiv = document.createElement("div");
   filterStatusDiv.id = "km77-filter-status";
-  filterStatusDiv.style.cssText = `
-        position: fixed;
-        bottom: 20px;
-        left: 20px;
-        background: #fff;
-        border: 1px solid #ddd;
-        padding: 10px;
-        box-shadow: 0 0 10px rgba(0,0,0,0.2);
-        z-index: 9999;
-        display: none;
-    `;
+  filterStatusDiv.style.cssText = `fill: red`;
   document.body.appendChild(filterStatusDiv);
 
   // Update filter status function
@@ -925,8 +1430,6 @@
       );
 
       if (pageChanging) {
-        console.log("KM77 Speaker Detector: Pagination change detected");
-
         // Clear processed rows tracking when pagination changes
         processedRows.clear();
 
@@ -980,7 +1483,6 @@
 
     // If new tables were found, merge them
     if (newTableFound) {
-      console.log("KM77 Speaker Detector: New table detected in DOM");
       // Reset processed rows tracking when new tables are found
       processedRows.clear();
       setTimeout(mergeTables, 500);
@@ -993,14 +1495,27 @@
     subtree: true,
   });
 
-  // Add styling for loading indicator and filters
+  // Add styling for performance cells
   const style = document.createElement("style");
   style.textContent = `
         .loading {
             color: #999;
             font-style: italic;
         }
-        
+
+        .performance-filter {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            align-items: center;
+            margin-top: 5px;
+        }
+
+        .accel-cell, .speed-cell {
+            font-size: 0.9em;
+            line-height: 1.2;
+        }
+
         .speaker-filter {
             display: flex;
             flex-wrap: wrap;
@@ -1008,48 +1523,45 @@
             align-items: center;
             margin-top: 5px;
         }
-        
+
         .slider-value {
             font-weight: bold;
             font-size: 12px;
             color: #333;
         }
-        
-        .speaker-filter button {
+
+        .speaker-filter button,
+        .performance-filter button {
             font-size: 11px;
             padding: 2px 5px;
         }
-        
-        .slider-button {
-            font-weight: bold;
-            min-width: 20px;
-            height: 20px;
-            line-height: 14px;
+
+        .slider-button span {
+            margin-left: 8px
         }
-        
-        /* Speaker cell styling for multiple options */
+
+        .slider-button {
+
+            width: 40px;
+            height: 20px;
+            line-height: 2;
+        }
+
+        /* Speaker cell style for multiple options */
         .speaker-cell > div {
             padding: 1px 0;
         }
-        
+
         .speaker-cell > div:not(:last-child) {
             border-bottom: 1px dotted #ccc;
         }
-        
+
         /* Style for combined speaker counts */
         .combined-speakers {
             position: relative;
-        }
-        
-        .combined-speakers:after {
-            content: "*";
-            font-size: 80%;
-            color: #0066cc;
-            position: relative;
-            top: -0.4em;
-        }
-        
-        /* Custom slider styling */
+        }\\
+
+        /* Custom slider style */
         input[type=range] {
             -webkit-appearance: none;
             appearance: none;
@@ -1058,7 +1570,7 @@
             background: #d3d3d3;
             border-radius: 3px;
         }
-        
+
         input[type=range]::-webkit-slider-thumb {
             -webkit-appearance: none;
             appearance: none;
@@ -1068,7 +1580,7 @@
             cursor: pointer;
             border-radius: 50%;
         }
-        
+
         input[type=range]::-moz-range-thumb {
             appearance: none;
             width: 16px;
@@ -1080,6 +1592,6 @@
     `;
   document.head.appendChild(style);
 
-  // Perform initial merge in case there are already multiple tables
+  // Perform initial merge if there are already multiple tables
   setTimeout(mergeTables, 500);
 })();
