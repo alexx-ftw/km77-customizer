@@ -73,7 +73,7 @@ const KM77FilterCore = (function () {
           const cylinderCount = parseInt(perfData.cylinders) || 0;
           if (
             cylinderCount > 0 &&
-            cylinderCount !== KM77.currentCylinderFilterValue
+            cylinderCount < KM77.currentCylinderFilterValue
           ) {
             showRow = false;
           }
@@ -182,7 +182,7 @@ const KM77FilterCore = (function () {
         const cylinderCount = parseInt(perfData.cylinders) || 0;
         if (
           cylinderCount > 0 &&
-          cylinderCount !== KM77.currentCylinderFilterValue
+          cylinderCount < KM77.currentCylinderFilterValue
         ) {
           showRow = false;
         }

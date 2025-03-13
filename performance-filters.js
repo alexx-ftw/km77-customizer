@@ -400,7 +400,7 @@ const KM77PerformanceFilters = (function () {
     const valueDisplay = document.createElement("span");
     valueDisplay.className = "slider-value";
     valueDisplay.textContent = KM77.cylinderFilterEnabled
-      ? `${KM77.currentCylinderFilterValue}`
+      ? `${KM77.currentCylinderFilterValue}+`
       : "OFF";
     valueDisplay.style.marginRight = "5px";
 
@@ -441,7 +441,7 @@ const KM77PerformanceFilters = (function () {
 
         // Update filter value
         KM77.currentCylinderFilterValue = count;
-        valueDisplay.textContent = count.toString();
+        valueDisplay.textContent = count.toString() + "+";
         localStorage.setItem("km77CylinderFilterValue", count.toString());
 
         // Apply filter
@@ -487,7 +487,7 @@ const KM77PerformanceFilters = (function () {
 
         // Update display
         KM77.currentCylinderFilterValue = valueToUse;
-        valueDisplay.textContent = valueToUse.toString();
+        valueDisplay.textContent = valueToUse.toString() + "+";
 
         // Highlight the corresponding button
         buttonGroup.querySelectorAll("button").forEach((button) => {

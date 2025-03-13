@@ -41,7 +41,9 @@ const KM77PerformanceDetector = (function () {
     }
 
     // Debug logging to see what we're working with
-    const debugFragment = content.match(/<tr>[\s\S]{0,200}Número de cilindros[\s\S]{0,200}<\/tr>/i);
+    const debugFragment = content.match(
+      /<tr>[\s\S]{0,200}Número de cilindros[\s\S]{0,200}<\/tr>/i
+    );
     if (debugFragment) {
       console.log("Found HTML fragment with cylinder info:", debugFragment[0]);
     }
@@ -51,19 +53,19 @@ const KM77PerformanceDetector = (function () {
     const cylinderRegexes = [
       // Exact pattern matching the HTML structure you provided
       /<tr><th[^>]*>\s*Número de cilindros\s*<\/th><td[^>]*>\s*(\d+)\s*<\/td><\/tr>/i,
-      
+
       // Pattern with explicit handling of whitespace and newlines
       /<tr><th[^>]*>[\s\n]*Número de cilindros[\s\n]*<\/th><td[^>]*>[\s\n]*(\d+)[\s\n]*<\/td><\/tr>/i,
-      
+
       // More tolerant pattern that allows any content between tags
       /<tr>[\s\S]*?<th[^>]*>[\s\S]*?Número de cilindros[\s\S]*?<\/th>[\s\S]*?<td[^>]*>[\s\S]*?(\d+)[\s\S]*?<\/td>[\s\S]*?<\/tr>/i,
-      
+
       // Super lenient pattern that just looks for a number after "Número de cilindros"
       /Número de cilindros[\s\S]*?<td[^>]*>[\s\S]*?(\d+)[\s\S]*?<\/td>/i,
-      
+
       // Alternative pattern using scope attribute in the HTML
       /<tr><th scope="row"[^>]*>[\s\S]*?Número de cilindros[\s\S]*?<\/th><td[^>]*>[\s\S]*?(\d+)[\s\S]*?<\/td><\/tr>/i,
-      
+
       // Previous patterns
       /<tr>\s*<th[^>]*>\s*Número de cilindros\s*<\/th>\s*<td[^>]*>\s*(\d+)\s*<\/td>\s*<\/tr>/i,
       /Número de cilindros[^<>]*<\/th>[\s\S]*?<td[^>]*>\s*(\d+)/i,
@@ -76,7 +78,9 @@ const KM77PerformanceDetector = (function () {
       const match = content.match(cylinderRegexes[i]);
       if (match) {
         cylinders = match[1].trim();
-        console.log(`Pattern #${i+1} matched! Found cylinder count: ${cylinders}`);
+        console.log(
+          `Pattern #${i + 1} matched! Found cylinder count: ${cylinders}`
+        );
         break;
       }
     }
