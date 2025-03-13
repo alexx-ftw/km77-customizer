@@ -7,7 +7,7 @@
 // @version     1.1
 // @author      -
 // @description Detects '6 Altavoces' in car listings on km77.com
-// @downloadUrl https://github.com/alexx-ftw/km77-customizer/blob/main/javascript_og.js
+// @downloadUrl https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/javascript_og.js
 // ==/UserScript==
 
 (function () {
