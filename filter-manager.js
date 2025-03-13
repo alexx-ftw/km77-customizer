@@ -684,34 +684,181 @@ const KM77FilterManager = (function () {
 
       // If we're within 500px of the bottom, try to trigger load more
       if (documentHeight - scrollPosition < 500) {
-        // Try to find the load more trigger
-        const pagedContent = document.querySelector(".js-paged-content");
-        if (pagedContent) {
-          // Check if there's more content to load
-          const nextUrl = pagedContent.getAttribute(
-            "data-paged-content-next-url"
-          );
-          const isLoading =
-            pagedContent.getAttribute("data-paged-content-loading") === "true";
-
-          if (nextUrl && !isLoading) {
-            console.log("KM77 Customizer: Manually triggering load more");
-
-            // Simulate scroll to the very bottom to trigger loading
-            window.scrollTo({
-              top: documentHeight,
-              behavior: "smooth",
-            });
-
-            // If that doesn't work, try to trigger the event programmatically
-            setTimeout(() => {
-              // Create and dispatch a scroll event
-              const scrollEvent = new Event("scroll");
-              window.dispatchEvent(scrollEvent);
-            }, 100);
-          }
-        }
+        triggerLoadMore();
       }
+    }
+  }
+
+  // Function to trigger loading more content using multiple strategies
+  function triggerLoadMore() {
+    // Try to find the load more trigger
+    const pagedContent = document.querySelector(".js-paged-content");
+    if (!pagedContent) return;
+
+    // Check if there's more content to load
+    const nextUrl = pagedContent.getAttribute("data-paged-content-next-url");
+    const isLoading =
+      pagedContent.getAttribute("data-paged-content-loading") === "true";
+
+    if (nextUrl && !isLoading) {
+      console.log("KM77 Customizer: Attempting to trigger load more...");
+
+      // Strategy 1: Try to find and click the load more button if it exists
+      const loadMoreButton = document.querySelector(
+        ".js-paged-content-load-more"
+      );
+      if (loadMoreButton) {
+        console.log("KM77 Customizer: Found load more button, clicking it");
+        loadMoreButton.click();
+        return;
+      }
+
+      // Strategy 2: Simulate scroll to the very bottom
+      window.scrollTo({
+        top: document.documentElement.scrollHeight,
+        behavior: "auto",
+      });
+
+      // Strategy 3: Dispatch both scroll and wheel events
+      setTimeout(() => {
+        try {
+          // Dispatch scroll event
+          window.dispatchEvent(new Event("scroll"));
+
+          // Dispatch wheel event for good measure
+          const wheelEvent = new WheelEvent("wheel", {
+            bubbles: true,
+            cancelable: true,
+            view: window,
+            deltaY: 100,
+          });
+          document.dispatchEvent(wheelEvent);
+
+          console.log("KM77 Customizer: Dispatched scroll and wheel events");
+
+          // Strategy 4: Try to directly trigger the paged content loading mechanism
+          // Look for any script that might handle the paged content
+          const scripts = document.querySelectorAll("script:not([src])");
+          let pagedContentScript = null;
+
+          for (const script of scripts) {
+            if (
+              script.textContent.includes("js-paged-content") &&
+              script.textContent.includes("loadMore")
+            ) {
+              pagedContentScript = script;
+              break;
+            }
+          }
+
+          // If we found the script, try to call the load function
+          if (pagedContentScript) {
+            console.log(
+              "KM77 Customizer: Found paged content script, attempting to call loadMore"
+            );
+
+            // Create a new script element to invoke loadMore
+            const invokeScript = document.createElement("script");
+            invokeScript.textContent = `
+              try {
+                // Try to find the loadMore function instance
+                const pagedContent = document.querySelector(".js-paged-content");
+                if (pagedContent && pagedContent._pagedContent) {
+                  pagedContent._pagedContent.loadMore();
+                  console.log("KM77 Customizer: Direct invocation of loadMore succeeded");
+                } else {
+                  // Fallback to jQuery if available
+                  if (typeof jQuery !== 'undefined') {
+                    jQuery(".js-paged-content").trigger("loadMore");
+                    console.log("KM77 Customizer: jQuery trigger of loadMore succeeded");
+                  }
+                }
+              } catch(e) {
+                console.error("KM77 Customizer: Error triggering loadMore", e);
+              }
+            `;
+            document.body.appendChild(invokeScript);
+            document.body.removeChild(invokeScript);
+          }
+
+          // Strategy 5: Schedule another check after a delay to ensure it worked
+          setTimeout(checkIfMoreContentLoaded, 2000);
+        } catch (error) {
+          console.error("KM77 Customizer: Error triggering load more:", error);
+        }
+      }, 100);
+    }
+  }
+
+  // Function to check if more content was loaded, and retry if not
+  function checkIfMoreContentLoaded() {
+    const pagedContent = document.querySelector(".js-paged-content");
+    if (!pagedContent) return;
+
+    const nextUrl = pagedContent.getAttribute("data-paged-content-next-url");
+    const isLoading =
+      pagedContent.getAttribute("data-paged-content-loading") === "true";
+
+    // If still has next URL and not currently loading, try an alternative approach
+    if (nextUrl && !isLoading) {
+      console.log(
+        "KM77 Customizer: Load more didn't trigger, trying alternative approach"
+      );
+
+      // Create a script element to try a more direct approach
+      const directLoadScript = document.createElement("script");
+      directLoadScript.textContent = `
+        try {
+          // Try to manually fetch the next page
+          const url = document.querySelector(".js-paged-content").getAttribute("data-paged-content-next-url");
+          if (url) {
+            fetch(url)
+              .then(response => response.text())
+              .then(html => {
+                console.log("KM77 Customizer: Manually fetched next page");
+                // Create a temporary element to parse the HTML
+                const tempDiv = document.createElement("div");
+                tempDiv.innerHTML = html;
+                
+                // Find new rows
+                const newRows = tempDiv.querySelectorAll("tr.search");
+                if (newRows.length > 0) {
+                  console.log("KM77 Customizer: Found " + newRows.length + " new rows");
+                  
+                  // Find our table body
+                  const tableBody = document.querySelector("table.table.table-hover tbody");
+                  if (tableBody) {
+                    // Append the new rows
+                    newRows.forEach(row => {
+                      const clonedRow = row.cloneNode(true);
+                      tableBody.appendChild(clonedRow);
+                    });
+                    
+                    // Update paged content attributes
+                    const nextPageUrl = tempDiv.querySelector(".js-paged-content")?.getAttribute("data-paged-content-next-url") || "";
+                    const pagedContent = document.querySelector(".js-paged-content");
+                    if (pagedContent) {
+                      pagedContent.setAttribute("data-paged-content-next-url", nextPageUrl);
+                      const currentOffset = parseInt(pagedContent.getAttribute("data-paged-content-offset") || "0");
+                      pagedContent.setAttribute("data-paged-content-offset", (currentOffset + newRows.length).toString());
+                    }
+                    
+                    // Trigger processing of new rows
+                    const event = new CustomEvent("km77NewRowsAdded");
+                    document.dispatchEvent(event);
+                  }
+                }
+              })
+              .catch(err => console.error("KM77 Customizer: Error fetching next page", err));
+          }
+        } catch(e) {
+          console.error("KM77 Customizer: Error in manual load", e);
+        }
+      `;
+      document.body.appendChild(directLoadScript);
+      setTimeout(() => {
+        document.body.removeChild(directLoadScript);
+      }, 100);
     }
   }
 
@@ -721,10 +868,28 @@ const KM77FilterManager = (function () {
     let scrollTimeout;
     window.addEventListener("scroll", function () {
       if (scrollTimeout) clearTimeout(scrollTimeout);
-      scrollTimeout = setTimeout(checkScrollPositionForLoadMore, 200);
+      scrollTimeout = setTimeout(checkScrollPositionForLoadMore, 150);
     });
 
-    console.log("KM77 Customizer: Scroll monitoring for load more initialized");
+    // Listen for custom event when new rows are manually added
+    document.addEventListener("km77NewRowsAdded", function () {
+      console.log("KM77 Customizer: Processing manually added rows");
+      setTimeout(() => {
+        // Try to process the new rows
+        if (
+          window.KM77TableManager &&
+          typeof KM77TableManager.processExistingRows === "function"
+        ) {
+          KM77TableManager.processExistingRows();
+        }
+        // Reapply filters
+        applyFilters();
+      }, 100);
+    });
+
+    console.log(
+      "KM77 Customizer: Enhanced scroll monitoring for load more initialized"
+    );
   }
 
   // Public API
@@ -735,5 +900,6 @@ const KM77FilterManager = (function () {
     addAccelerationFilterControls: addAccelerationFilterControls,
     addSpeakerFilterControls: addSpeakerFilterControls,
     setupScrollMonitoring: setupScrollMonitoring,
+    triggerLoadMore: triggerLoadMore, // Export for manual triggering if needed
   };
 })();

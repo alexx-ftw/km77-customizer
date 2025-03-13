@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        KM77 Customizer
 // @namespace   https://github.com/alexx-ftw/km77-customizer
-// @version     2.1
+// @version     2.2
 // @author      alexx-ftw
 // @description Enhanced car listing viewer for km77.com with speaker detection and performance metrics
 // @match       https://www.km77.com/buscador*
@@ -10,8 +10,8 @@
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/table-manager.js
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/speaker-detector.js
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/performance-detector.js
-// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/filter-manager.js?v=1
-// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/ui-components.js?v=1
+// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/filter-manager.js?v=2
+// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/ui-components.js?v=2
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/styles.js?v=1
 // @downloadUrl https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/km77-core.js
 // ==/UserScript==
@@ -140,6 +140,9 @@
     // Initialize scroll monitoring for load more functionality
     KM77FilterManager.setupScrollMonitoring();
 
+    // Add manual load more button
+    addManualLoadMoreButton();
+
     // Initial processing of existing rows
     KM77TableManager.processExistingRows();
 
@@ -151,6 +154,44 @@
 
     // Apply full width one more time after all loading is complete
     setTimeout(setTableFullWidth, 1500);
+  }
+
+  // Add a button to manually trigger load more
+  function addManualLoadMoreButton() {
+    const loadMoreButton = document.createElement("button");
+    loadMoreButton.textContent = "Load More";
+    loadMoreButton.className = "btn btn-primary km77-load-more";
+    loadMoreButton.style.cssText = `
+      position: fixed;
+      bottom: 70px;
+      right: 10px;
+      z-index: 9999;
+      display: none;
+    `;
+
+    loadMoreButton.addEventListener("click", function () {
+      KM77FilterManager.triggerLoadMore();
+    });
+
+    document.body.appendChild(loadMoreButton);
+
+    // Show button only when filters are active
+    const observer = new MutationObserver(function (mutations) {
+      mutations.forEach(function (mutation) {
+        if (
+          mutation.type === "attributes" &&
+          mutation.attributeName === "style" &&
+          KM77.filterStatusDiv
+        ) {
+          loadMoreButton.style.display =
+            KM77.filterStatusDiv.style.display === "block" ? "block" : "none";
+        }
+      });
+    });
+
+    if (KM77.filterStatusDiv) {
+      observer.observe(KM77.filterStatusDiv, { attributes: true });
+    }
   }
 
   // Initialize when DOM content is loaded

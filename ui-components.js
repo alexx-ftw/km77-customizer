@@ -53,6 +53,27 @@ const KM77UI = (function () {
     if (hidden > 0) {
       KM77.filterStatusDiv.style.display = "block";
       KM77.filterStatusDiv.innerHTML = `Filtro aplicado: Ocultando ${hidden} de ${total} coches`;
+
+      // Add a load more link if needed
+      if (!KM77.filterStatusDiv.querySelector(".load-more-link")) {
+        const loadMoreLink = document.createElement("a");
+        loadMoreLink.href = "#";
+        loadMoreLink.className = "load-more-link";
+        loadMoreLink.textContent = " [Cargar más]";
+        loadMoreLink.style.color = "#fff";
+        loadMoreLink.style.textDecoration = "underline";
+        loadMoreLink.style.marginLeft = "5px";
+        loadMoreLink.addEventListener("click", function (e) {
+          e.preventDefault();
+          if (
+            KM77FilterManager &&
+            typeof KM77FilterManager.triggerLoadMore === "function"
+          ) {
+            KM77FilterManager.triggerLoadMore();
+          }
+        });
+        KM77.filterStatusDiv.appendChild(loadMoreLink);
+      }
     } else {
       KM77.filterStatusDiv.style.display = "none";
     }
