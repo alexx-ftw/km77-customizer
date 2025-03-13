@@ -150,11 +150,11 @@ const KM77SpeakerFilter = (function () {
 
     // Reset button clears the filter
     resetButton.addEventListener("click", () => {
-      filterSlider.value = "0";
-      sliderValueDisplay.textContent = "0+";
-      KM77.currentFilterValue = 0;
-      localStorage.setItem("km77SpeakerFilterValue", "0");
-      localStorage.setItem("km77SpeakerFilterManual", "0");
+      filterSlider.value = "6";
+      sliderValueDisplay.textContent = "6+";
+      KM77.currentFilterValue = 6;
+      localStorage.setItem("km77SpeakerFilterValue", "6");
+      localStorage.setItem("km77SpeakerFilterManual", "6");
       KM77FilterCore.applyFilters();
     });
 

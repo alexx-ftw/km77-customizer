@@ -18,7 +18,7 @@
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/speaker-detector.js?v=1
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/performance-detector.js?v=4
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/filter-core.js?v=6
-// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/speaker-filter.js?v=1
+// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/speaker-filter.js?v=2
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/performance-filters.js?v=3
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/pagination-manager.js?v=2
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/filter-manager.js?v=7
