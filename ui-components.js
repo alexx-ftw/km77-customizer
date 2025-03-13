@@ -76,6 +76,7 @@ const KM77UI = (function () {
 
     // Add event listener for toggle action
     masterToggleButton.addEventListener("click", () => {
+      console.log("KM77 Customizer: Master filter toggle button clicked");
       toggleAllFilters(masterToggleButton);
     });
 
@@ -83,6 +84,10 @@ const KM77UI = (function () {
     KM77.masterToggleButton = masterToggleButton;
 
     console.log("KM77 Customizer: Master filter toggle button created");
+    console.log(
+      "KM77 Customizer: Initial filter state - disabled:",
+      allFiltersDisabled
+    );
 
     // Add a failsafe to ensure the button is visible after a delay
     setTimeout(() => {
@@ -95,6 +100,15 @@ const KM77UI = (function () {
 
       // Force button to be shown
       masterToggleButton.style.display = "block";
+
+      // Double check the button state
+      const currentState =
+        localStorage.getItem("km77AllFiltersDisabled") === "true";
+      updateMasterToggleButtonState(masterToggleButton, currentState);
+      console.log(
+        "KM77 Customizer: Button visibility ensured, state:",
+        currentState ? "disabled" : "enabled"
+      );
     }, 2000);
   }
 
@@ -104,15 +118,25 @@ const KM77UI = (function () {
     const allFiltersDisabled =
       localStorage.getItem("km77AllFiltersDisabled") === "true";
 
+    console.log(
+      "KM77 Customizer: Toggling filters, current disabled state:",
+      allFiltersDisabled
+    );
+
     if (allFiltersDisabled) {
       // Re-enable all filters with previous states
+      console.log("KM77 Customizer: Enabling filters with previous states");
       enableAllFilters();
       localStorage.setItem("km77AllFiltersDisabled", "false");
     } else {
       // Store current states before disabling
+      console.log(
+        "KM77 Customizer: Storing current filter states before disabling"
+      );
       storeCurrentFilterStates();
 
       // Disable all filters
+      console.log("KM77 Customizer: Disabling all filters");
       disableAllFilters();
       localStorage.setItem("km77AllFiltersDisabled", "true");
     }
@@ -121,11 +145,31 @@ const KM77UI = (function () {
     updateMasterToggleButtonState(button, !allFiltersDisabled);
 
     // Apply filter changes
+    console.log("KM77 Customizer: Applying filter changes after toggle");
     KM77FilterCore.applyFilters();
+
+    // Show status message
+    showMessage(
+      allFiltersDisabled
+        ? "Filters enabled with previous settings"
+        : "All filters disabled",
+      2000
+    );
   }
 
   // Store all current filter states before disabling
   function storeCurrentFilterStates() {
+    console.log(
+      "KM77 Customizer: Storing filter states - Speaker:",
+      !KM77.filtersDisabled,
+      "Speed:",
+      KM77.speedFilterEnabled,
+      "Accel:",
+      KM77.accelFilterEnabled,
+      "Cylinder:",
+      KM77.cylinderFilterEnabled
+    );
+
     // Store speaker filter state
     localStorage.setItem(
       "km77PreviousSpeakerFiltersDisabled",
@@ -193,13 +237,27 @@ const KM77UI = (function () {
 
     // Update UI controls if they exist
     updateFilterUIControls(true);
+
+    console.log("KM77 Customizer: All filters disabled");
   }
 
   // Enable all filters with their previous states
   function enableAllFilters() {
-    // Restore speaker filter state
+    // Load previous states with fallbacks
+
+    // Restore speaker filter state (inverted from disabled to enabled)
     KM77.filtersDisabled =
       localStorage.getItem("km77PreviousSpeakerFiltersDisabled") === "true";
+
+    // If no previous state is found, default to enabled with value 6
+    if (localStorage.getItem("km77PreviousSpeakerFiltersDisabled") === null) {
+      KM77.filtersDisabled = false;
+      console.log(
+        "KM77 Customizer: No previous speaker filter state found, defaulting to enabled"
+      );
+    }
+
+    // Get previous speaker value or default to 6
     const speakerValue = parseInt(
       localStorage.getItem("km77PreviousSpeakerFilterValue") || "6"
     );
@@ -207,41 +265,80 @@ const KM77UI = (function () {
     localStorage.setItem("km77SpeakerFiltersDisabled", KM77.filtersDisabled);
     localStorage.setItem("km77SpeakerFilterValue", speakerValue.toString());
 
+    console.log(
+      "KM77 Customizer: Restored speaker filter - Disabled:",
+      KM77.filtersDisabled,
+      "Value:",
+      speakerValue
+    );
+
     // Restore speed filter state
-    KM77.speedFilterEnabled =
+    const wasSpeedEnabled =
       localStorage.getItem("km77PreviousSpeedFilterEnabled") === "true";
+    KM77.speedFilterEnabled = wasSpeedEnabled;
+
+    // Default to a reasonable speed value if needed
     const speedValue = parseInt(
       localStorage.getItem("km77PreviousSpeedFilterValue") || "140"
     );
     KM77.currentSpeedFilterValue = speedValue;
-    localStorage.setItem("km77SpeedFilterEnabled", KM77.speedFilterEnabled);
+    localStorage.setItem("km77SpeedFilterEnabled", wasSpeedEnabled.toString());
     localStorage.setItem("km77SpeedFilterValue", speedValue.toString());
 
+    console.log(
+      "KM77 Customizer: Restored speed filter - Enabled:",
+      wasSpeedEnabled,
+      "Value:",
+      speedValue
+    );
+
     // Restore acceleration filter state
-    KM77.accelFilterEnabled =
+    const wasAccelEnabled =
       localStorage.getItem("km77PreviousAccelFilterEnabled") === "true";
+    KM77.accelFilterEnabled = wasAccelEnabled;
+
+    // Default to a reasonable acceleration value if needed
     const accelValue = parseFloat(
       localStorage.getItem("km77PreviousAccelFilterValue") || "8"
     );
     KM77.currentAccelFilterValue = accelValue;
-    localStorage.setItem("km77AccelFilterEnabled", KM77.accelFilterEnabled);
+    localStorage.setItem("km77AccelFilterEnabled", wasAccelEnabled.toString());
     localStorage.setItem("km77AccelFilterValue", accelValue.toString());
 
+    console.log(
+      "KM77 Customizer: Restored accel filter - Enabled:",
+      wasAccelEnabled,
+      "Value:",
+      accelValue
+    );
+
     // Restore cylinder filter state
-    KM77.cylinderFilterEnabled =
+    const wasCylinderEnabled =
       localStorage.getItem("km77PreviousCylinderFilterEnabled") === "true";
+    KM77.cylinderFilterEnabled = wasCylinderEnabled;
+
+    // Default to 4 cylinders if needed
     const cylinderValue = parseInt(
       localStorage.getItem("km77PreviousCylinderFilterValue") || "4"
     );
     KM77.currentCylinderFilterValue = cylinderValue;
     localStorage.setItem(
       "km77CylinderFilterEnabled",
-      KM77.cylinderFilterEnabled
+      wasCylinderEnabled.toString()
     );
     localStorage.setItem("km77CylinderFilterValue", cylinderValue.toString());
 
+    console.log(
+      "KM77 Customizer: Restored cylinder filter - Enabled:",
+      wasCylinderEnabled,
+      "Value:",
+      cylinderValue
+    );
+
     // Update UI controls if they exist
     updateFilterUIControls(false);
+
+    console.log("KM77 Customizer: All filters restored to previous states");
   }
 
   // Update UI controls to reflect current filter states

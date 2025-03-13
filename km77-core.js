@@ -20,7 +20,7 @@
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/performance-filters.js?v=3
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/pagination-manager.js?v=2
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/filter-manager.js?v=7
-// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/ui-components.js?v=9
+// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/ui-components.js?v=11
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/styles.js?v=1
 // @downloadUrl https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/km77-core.js
 // ==/UserScript==
