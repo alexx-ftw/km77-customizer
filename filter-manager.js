@@ -59,6 +59,9 @@ const KM77FilterManager = (function () {
     addAccelerationFilterControls: function (header) {
       return KM77PerformanceFilters.addAccelerationFilterControls(header);
     },
+    addCylinderFilterControls: function (header) {
+      return KM77PerformanceFilters.addCylinderFilterControls(header);
+    },
 
     // Pagination functions
     setupScrollMonitoring: function () {

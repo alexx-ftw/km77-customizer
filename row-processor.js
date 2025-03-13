@@ -64,6 +64,20 @@ const KM77RowProcessor = (function () {
       row.appendChild(accelCell);
     }
 
+    // Add a new cell for cylinder info
+    let cylinderCell;
+    const cylinderLastCell = row.querySelector("td.cylinder-cell");
+    if (cylinderLastCell) {
+      cylinderCell = cylinderLastCell;
+    } else {
+      // Create a new cell
+      cylinderCell = document.createElement("td");
+      cylinderCell.style.textAlign = "right";
+      cylinderCell.className = "align-middle cylinder-cell";
+      cylinderCell.innerHTML = '<span class="loading">Cargando...</span>';
+      row.appendChild(cylinderCell);
+    }
+
     // Add a new cell for speakers info
     let speakersCell;
     const lastCell = row.querySelector("td.speaker-cell");
@@ -84,6 +98,7 @@ const KM77RowProcessor = (function () {
       speakersCell.innerHTML = "Error";
       speedCell.innerHTML = "Error";
       accelCell.innerHTML = "Error";
+      cylinderCell.innerHTML = "Error";
       KM77.speakerData.set(carId, null);
       KM77.performanceData.set(carId, null);
       KM77UI.updateStatus(
@@ -103,13 +118,23 @@ const KM77RowProcessor = (function () {
       onload: function (response) {
         const content = response.responseText;
 
-        // Process performance data
+        // Process performance data (now includes cylinders)
         KM77PerformanceDetector.processPerformanceData(
           content,
           carId,
           speedCell,
           accelCell
         );
+
+        // Update cylinder cell
+        const perfData = KM77.performanceData.get(carId);
+        if (perfData && perfData.cylinders && perfData.cylinders !== "-") {
+          cylinderCell.innerHTML = perfData.cylinders;
+          cylinderCell.style.color = "#0066cc";
+          cylinderCell.style.fontWeight = "bold";
+        } else {
+          cylinderCell.innerHTML = "-";
+        }
 
         // Check if we need to make an additional request for equipment data
         if (
@@ -169,6 +194,7 @@ const KM77RowProcessor = (function () {
         speakersCell.innerHTML = "Error";
         speedCell.innerHTML = "Error";
         accelCell.innerHTML = "Error";
+        cylinderCell.innerHTML = "Error";
         KM77.speakerData.set(carId, null);
         KM77.performanceData.set(carId, null);
         KM77UI.updateStatus(
@@ -181,6 +207,7 @@ const KM77RowProcessor = (function () {
         speakersCell.innerHTML = "Timeout";
         speedCell.innerHTML = "Timeout";
         accelCell.innerHTML = "Timeout";
+        cylinderCell.innerHTML = "Timeout";
         KM77.speakerData.set(carId, null);
         KM77.performanceData.set(carId, null);
         KM77UI.updateStatus(

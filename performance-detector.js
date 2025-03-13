@@ -40,6 +40,23 @@ const KM77PerformanceDetector = (function () {
       }
     }
 
+    // Extract number of cylinders
+    let cylinders = null;
+    const cylinderRegexes = [
+      /<tr>\s*<th[^>]*>\s*Número de cilindros\s*<\/th>\s*<td[^>]*>\s*(\d+)\s*<\/td>\s*<\/tr>/i,
+      /Número de cilindros[^<>]*<\/th>[\s\S]*?<td[^>]*>(\d+)/i,
+      /Cilindros[^<]*<\/th>[^<]*<td[^>]*>([0-9]+)/i,
+    ];
+
+    for (const regex of cylinderRegexes) {
+      const match = content.match(regex);
+      if (match) {
+        cylinders = match[1];
+        console.log(`Found cylinder count: ${cylinders}`);
+        break;
+      }
+    }
+
     // Try raw search as last resort for maximum speed
     if (!maxSpeed) {
       // Find any tr containing "Velocidad máxima" for debugging
@@ -98,6 +115,7 @@ const KM77PerformanceDetector = (function () {
     KM77.performanceData.set(carId, {
       maxSpeed: maxSpeed || "-",
       acceleration: acceleration || "-",
+      cylinders: cylinders || "-",
     });
   }
 

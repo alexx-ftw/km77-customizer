@@ -387,9 +387,138 @@ const KM77PerformanceFilters = (function () {
     console.log("KM77 Customizer: Added acceleration filter controls");
   }
 
+  // Function to add cylinder filter controls
+  function addCylinderFilterControls(header) {
+    if (!header) return;
+
+    // Create cylinder filter UI
+    const filterContainer = document.createElement("div");
+    filterContainer.className = "performance-filter";
+    filterContainer.style.marginTop = "5px";
+
+    // Create cylinder filter label
+    const valueDisplay = document.createElement("span");
+    valueDisplay.className = "slider-value";
+    valueDisplay.textContent = KM77.cylinderFilterEnabled
+      ? `${KM77.currentCylinderFilterValue}`
+      : "OFF";
+    valueDisplay.style.marginRight = "5px";
+
+    // Create cylinder selector buttons
+    const buttonGroup = document.createElement("div");
+    buttonGroup.className = "btn-group btn-group-sm";
+    buttonGroup.style.marginRight = "5px";
+
+    // Common cylinder counts: 3, 4, 5, 6, 8, 10, 12
+    const commonCylinders = [3, 4, 6, 8];
+
+    commonCylinders.forEach((count) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "btn btn-sm btn-outline-secondary";
+      btn.textContent = count.toString();
+      btn.disabled = !KM77.cylinderFilterEnabled;
+
+      // Highlight the selected value
+      if (
+        KM77.cylinderFilterEnabled &&
+        KM77.currentCylinderFilterValue === count
+      ) {
+        btn.classList.remove("btn-outline-secondary");
+        btn.classList.add("btn-secondary");
+      }
+
+      btn.addEventListener("click", () => {
+        // Update active class for all buttons
+        buttonGroup.querySelectorAll("button").forEach((button) => {
+          button.classList.remove("btn-secondary");
+          button.classList.add("btn-outline-secondary");
+        });
+
+        // Highlight clicked button
+        btn.classList.remove("btn-outline-secondary");
+        btn.classList.add("btn-secondary");
+
+        // Update filter value
+        KM77.currentCylinderFilterValue = count;
+        valueDisplay.textContent = count.toString();
+        localStorage.setItem("km77CylinderFilterValue", count.toString());
+
+        // Apply filter
+        KM77FilterCore.applyFilters();
+      });
+
+      buttonGroup.appendChild(btn);
+    });
+
+    // Create cylinder filter toggle button
+    const toggleBtn = document.createElement("button");
+    toggleBtn.textContent = KM77.cylinderFilterEnabled ? "Quitar" : "Filtrar";
+    toggleBtn.className = KM77.cylinderFilterEnabled
+      ? "btn btn-sm btn-danger"
+      : "btn btn-sm btn-success";
+    toggleBtn.style.marginLeft = "5px";
+
+    // Toggle cylinder filter functionality
+    toggleBtn.addEventListener("click", () => {
+      const isEnabled = KM77.cylinderFilterEnabled;
+
+      // Update all button states
+      buttonGroup.querySelectorAll("button").forEach((button) => {
+        button.disabled = isEnabled;
+      });
+
+      if (isEnabled) {
+        // Turning off
+        toggleBtn.textContent = "Filtrar";
+        toggleBtn.className = "btn btn-sm btn-success";
+        valueDisplay.textContent = "OFF";
+        KM77.currentCylinderFilterValue = 0;
+        localStorage.setItem("km77CylinderFilterValue", "0");
+        localStorage.setItem("km77CylinderFilterEnabled", "false");
+      } else {
+        // Turning on
+        toggleBtn.textContent = "Quitar";
+        toggleBtn.className = "btn btn-sm btn-danger";
+
+        // Default to 4 cylinders if no previous value
+        const savedValue = localStorage.getItem("km77CylinderFilterValue");
+        const valueToUse = (savedValue && parseInt(savedValue)) || 4;
+
+        // Update display
+        KM77.currentCylinderFilterValue = valueToUse;
+        valueDisplay.textContent = valueToUse.toString();
+
+        // Highlight the corresponding button
+        buttonGroup.querySelectorAll("button").forEach((button) => {
+          if (parseInt(button.textContent) === valueToUse) {
+            button.classList.remove("btn-outline-secondary");
+            button.classList.add("btn-secondary");
+          }
+        });
+
+        // Save settings
+        localStorage.setItem("km77CylinderFilterValue", valueToUse.toString());
+        localStorage.setItem("km77CylinderFilterEnabled", "true");
+      }
+
+      KM77.cylinderFilterEnabled = !isEnabled;
+      KM77FilterCore.applyFilters();
+    });
+
+    // Add cylinder filter components
+    filterContainer.appendChild(valueDisplay);
+    filterContainer.appendChild(buttonGroup);
+    filterContainer.appendChild(toggleBtn);
+    header.appendChild(filterContainer);
+
+    console.log("KM77 Customizer: Added cylinder filter controls");
+  }
+
   // Public API
   return {
     addSpeedFilterControls: addSpeedFilterControls,
     addAccelerationFilterControls: addAccelerationFilterControls,
+    addCylinderFilterControls: addCylinderFilterControls,
   };
 })();

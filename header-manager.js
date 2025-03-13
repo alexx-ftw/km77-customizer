@@ -35,6 +35,13 @@ const KM77HeaderManager = (function () {
         'Aceleración<br><span class="font-size-2xs font-weight-normal text-nowrap text-primary text-right">0-100 km/h</span>';
       headerRow.appendChild(accelHeader);
 
+      // Create cylinder header
+      const cylinderHeader = document.createElement("th");
+      cylinderHeader.className = "text-right cylinder-header";
+      cylinderHeader.innerHTML =
+        'Cilindros<br><span class="font-size-2xs font-weight-normal text-nowrap text-primary text-right">Nº</span>';
+      headerRow.appendChild(cylinderHeader);
+
       // Create speaker header
       const speakerHeader = document.createElement("th");
       speakerHeader.className = "text-right speaker-header";
@@ -47,6 +54,7 @@ const KM77HeaderManager = (function () {
       // Add filter controls to headers
       KM77FilterManager.addSpeedFilterControls(speedHeader);
       KM77FilterManager.addAccelerationFilterControls(accelHeader);
+      KM77FilterManager.addCylinderFilterControls(cylinderHeader);
       KM77FilterManager.addSpeakerFilterControls(speakerHeader);
     } catch (e) {
       console.error("KM77 Customizer: Error adding header columns", e);

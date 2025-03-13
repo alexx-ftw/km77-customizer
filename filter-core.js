@@ -62,6 +62,24 @@ const KM77FilterCore = (function () {
         }
       }
 
+      // Apply cylinder filter if active
+      if (
+        showRow &&
+        KM77.cylinderFilterEnabled &&
+        KM77.currentCylinderFilterValue > 0
+      ) {
+        const perfData = KM77.performanceData.get(carId);
+        if (perfData && perfData.cylinders) {
+          const cylinderCount = parseInt(perfData.cylinders) || 0;
+          if (
+            cylinderCount > 0 &&
+            cylinderCount !== KM77.currentCylinderFilterValue
+          ) {
+            showRow = false;
+          }
+        }
+      }
+
       // Show or hide row based on filter status
       if (!showRow) {
         row.style.display = "none";
@@ -148,6 +166,24 @@ const KM77FilterCore = (function () {
         const accelStr = perfData.acceleration.replace(",", ".");
         const accel = parseFloat(accelStr) || 0;
         if (accel > 0 && accel > KM77.currentAccelFilterValue) {
+          showRow = false;
+        }
+      }
+    }
+
+    // Apply cylinder filter if active
+    if (
+      showRow &&
+      KM77.cylinderFilterEnabled &&
+      KM77.currentCylinderFilterValue > 0
+    ) {
+      const perfData = KM77.performanceData.get(carId);
+      if (perfData && perfData.cylinders) {
+        const cylinderCount = parseInt(perfData.cylinders) || 0;
+        if (
+          cylinderCount > 0 &&
+          cylinderCount !== KM77.currentCylinderFilterValue
+        ) {
           showRow = false;
         }
       }
