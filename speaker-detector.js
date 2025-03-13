@@ -19,8 +19,53 @@ const KM77SpeakerDetector = (function () {
     while ((tableRowMatch = tableRowRegex.exec(content)) !== null) {
       const rowText = tableRowMatch[1];
 
-      // Skip if we don't have speaker references
-      if (!rowText.match(/[aA]ltavoces/)) continue;
+      // Skip if we don't have speaker references or audio system references
+      if (
+        !rowText.match(
+          /[aA]ltavoces|[sS]onido|[aA]udio|FOCAL|BOSE|Harman|Burmester|B&O|Bang/i
+        )
+      )
+        continue;
+
+      // Check for premium audio systems with complex configurations
+      const premiumMatch = rowText.match(
+        /(\d+)\s*[aA]ltavoces\s*\+\s*(\d+)\s*[tT]witters?|(\d+)\s*[aA]ltavoces\s*\+\s*(\d+)\s*[tT]weeters?/i
+      );
+
+      if (premiumMatch) {
+        // Found pattern like "4 altavoces + 4 twitters"
+        let totalSpeakers = 0;
+
+        // Sum the explicitly mentioned speakers and tweeters
+        if (premiumMatch[1] && premiumMatch[2]) {
+          totalSpeakers = parseInt(premiumMatch[1]) + parseInt(premiumMatch[2]);
+        } else if (premiumMatch[3] && premiumMatch[4]) {
+          totalSpeakers = parseInt(premiumMatch[3]) + parseInt(premiumMatch[4]);
+        }
+
+        // Look for additional components
+        if (
+          rowText.match(/v[ií]a\s+central|canal\s+central|center\s+channel/i)
+        ) {
+          totalSpeakers += 1; // Add center channel
+        }
+
+        if (rowText.match(/caja\s+de\s+graves|subwoofer|sub-woofer|bajo/i)) {
+          totalSpeakers += 1; // Add subwoofer
+        }
+
+        // Add as a premium configuration
+        speakerConfigurations.push({
+          text: rowText.trim(),
+          count: totalSpeakers,
+          isPremiumSystem: true,
+          originalDescription: rowText.trim(),
+        });
+
+        // Add to processed set to avoid duplicates
+        processedDescriptions.add(rowText.trim());
+        continue;
+      }
 
       // Check if this is a combined speaker system (multiple speaker references in one row)
       const regExp = /(\d+)\s*[aA]ltavoces/g;
@@ -63,6 +108,10 @@ const KM77SpeakerDetector = (function () {
       /\d+\s*canales.*?(\d+)\s*[aA]ltavoces/g,
       // Match cases where "altavoces" appears first followed by a number
       /[aA]ltavoces[:\s]*(\d+)(?:\s*\([^)]*\))?/g,
+      // Match brand-specific patterns for premium audio systems
+      /FOCAL.*?(\d+)\s*[aA]ltavoces/g,
+      /BOSE.*?(\d+)\s*[aA]ltavoces/g,
+      /Harman.*?(\d+)\s*[aA]ltavoces/g,
     ];
 
     // Extract speaker contexts - get surrounding text for context
@@ -75,9 +124,11 @@ const KM77SpeakerDetector = (function () {
       const description = contextMatch[1].trim();
       const status = contextMatch[2].trim();
 
-      // Only process if it mentions speakers and we haven't already processed it
+      // Only process if it mentions speakers/audio and we haven't already processed it
       if (
-        description.match(/[aA]ltavoces/) &&
+        description.match(
+          /[aA]ltavoces|[sS]onido|[aA]udio|FOCAL|BOSE|Harman|Burmester|B&O|Bang/i
+        ) &&
         !processedDescriptions.has(description)
       ) {
         speakerContexts.push({
@@ -89,6 +140,52 @@ const KM77SpeakerDetector = (function () {
 
     // Process each context
     speakerContexts.forEach((context) => {
+      // Check for premium system patterns first
+      const premiumMatch = context.description.match(
+        /(\d+)\s*[aA]ltavoces\s*\+\s*(\d+)\s*[tT]witters?|(\d+)\s*[aA]ltavoces\s*\+\s*(\d+)\s*[tT]weeters?/i
+      );
+
+      if (premiumMatch) {
+        // Found pattern like "4 altavoces + 4 twitters"
+        let totalSpeakers = 0;
+
+        // Sum the explicitly mentioned speakers and tweeters
+        if (premiumMatch[1] && premiumMatch[2]) {
+          totalSpeakers = parseInt(premiumMatch[1]) + parseInt(premiumMatch[2]);
+        } else if (premiumMatch[3] && premiumMatch[4]) {
+          totalSpeakers = parseInt(premiumMatch[3]) + parseInt(premiumMatch[4]);
+        }
+
+        // Look for additional components
+        if (
+          context.description.match(
+            /v[ií]a\s+central|canal\s+central|center\s+channel/i
+          )
+        ) {
+          totalSpeakers += 1; // Add center channel
+        }
+
+        if (
+          context.description.match(
+            /caja\s+de\s+graves|subwoofer|sub-woofer|bajo/i
+          )
+        ) {
+          totalSpeakers += 1; // Add subwoofer
+        }
+
+        // Add as a premium configuration
+        speakerConfigurations.push({
+          text: `${context.description} (${context.status})`,
+          count: totalSpeakers,
+          isPremiumSystem: true,
+          originalDescription: context.description,
+        });
+
+        // Add to processed set to avoid duplicates
+        processedDescriptions.add(context.description);
+        return; // Skip further processing for this context
+      }
+
       // Find all speaker counts in this context
       for (const regex of speakerRegexes) {
         regex.lastIndex = 0; // Reset regex state
@@ -117,17 +214,29 @@ const KM77SpeakerDetector = (function () {
     const uniqueConfigs = [];
     const seenCounts = new Set();
 
-    // First add combined configurations (they take priority)
+    // First add premium system configurations (they take priority)
     speakerConfigurations
-      .filter((config) => config.isMultipleSum)
+      .filter((config) => config.isPremiumSystem)
+      .sort((a, b) => b.count - a.count) // Sort by count descending
       .forEach((config) => {
         uniqueConfigs.push(config);
         seenCounts.add(config.count);
       });
 
+    // Then add combined configurations
+    speakerConfigurations
+      .filter((config) => config.isMultipleSum && !config.isPremiumSystem)
+      .sort((a, b) => b.count - a.count) // Sort by count descending
+      .forEach((config) => {
+        if (!seenCounts.has(config.count)) {
+          uniqueConfigs.push(config);
+          seenCounts.add(config.count);
+        }
+      });
+
     // Then add other configurations if their count hasn't been seen
     speakerConfigurations
-      .filter((config) => !config.isMultipleSum)
+      .filter((config) => !config.isMultipleSum && !config.isPremiumSystem)
       .sort((a, b) => b.count - a.count) // Sort by count descending
       .forEach((config) => {
         if (!seenCounts.has(config.count)) {
@@ -163,7 +272,9 @@ const KM77SpeakerDetector = (function () {
     if (uniqueConfigs.length > 0) {
       // Format display text showing all combined configurations
       const displayItems = uniqueConfigs.map((config) => {
-        if (config.isMultipleSum) {
+        if (config.isPremiumSystem) {
+          return `<div title="${config.text}" class="combined-speakers">${config.count}★</div>`;
+        } else if (config.isMultipleSum) {
           return `<div title="${config.text}" class="combined-speakers">${config.count}*</div>`;
         }
         return `<div title="${config.text}">${config.count}</div>`;
