@@ -4,7 +4,7 @@
 // @version     2.0
 // @author      alexx-ftw
 // @description Enhanced car listing viewer for km77.com with speaker detection and performance metrics
-// @match       https://www.km77.com/*
+// @match       https://www.km77.com/buscador*
 // @grant       GM_xmlhttpRequest
 // @connect     www.km77.com
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/table-manager.js
