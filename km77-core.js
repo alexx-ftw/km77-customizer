@@ -1,10 +1,12 @@
 // ==UserScript==
 // @name        KM77 Customizer
 // @namespace   https://github.com/alexx-ftw/km77-customizer
-// @version     2.5
+// @version     2.8
 // @author      alexx-ftw
 // @description Enhanced car listing viewer for km77.com with speaker detection and performance metrics
 // @match       https://www.km77.com/buscador*
+// @match       https://www.km77.com/coches/*/*/*/*
+// @exclude     https://www.km77.com/coches/*/*/*/*/*
 // @grant       GM_xmlhttpRequest
 // @connect     www.km77.com
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/row-processor.js?v=2
