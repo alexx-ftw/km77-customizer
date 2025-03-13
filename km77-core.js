@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        KM77 Customizer
 // @namespace   https://github.com/alexx-ftw/km77-customizer
-// @version     2.2
+// @version     2.3
 // @author      alexx-ftw
 // @description Enhanced car listing viewer for km77.com with speaker detection and performance metrics
 // @match       https://www.km77.com/buscador*
@@ -10,8 +10,8 @@
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/table-manager.js
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/speaker-detector.js
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/performance-detector.js
-// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/filter-manager.js?v=2
-// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/ui-components.js?v=2
+// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/filter-manager.js?v=3
+// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/ui-components.js?v=3
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/styles.js?v=1
 // @downloadUrl https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/km77-core.js
 // ==/UserScript==
@@ -159,7 +159,7 @@
   // Add a button to manually trigger load more
   function addManualLoadMoreButton() {
     const loadMoreButton = document.createElement("button");
-    loadMoreButton.textContent = "Load More";
+    loadMoreButton.textContent = "Cargar Más";
     loadMoreButton.className = "btn btn-primary km77-load-more";
     loadMoreButton.style.cssText = `
       position: fixed;
@@ -167,15 +167,27 @@
       right: 10px;
       z-index: 9999;
       display: none;
+      padding: 10px 15px;
+      font-weight: bold;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
     `;
 
     loadMoreButton.addEventListener("click", function () {
       KM77FilterManager.triggerLoadMore();
+
+      // Visual feedback
+      loadMoreButton.textContent = "Cargando...";
+      loadMoreButton.disabled = true;
+
+      setTimeout(() => {
+        loadMoreButton.textContent = "Cargar Más";
+        loadMoreButton.disabled = false;
+      }, 2000);
     });
 
     document.body.appendChild(loadMoreButton);
 
-    // Show button only when filters are active
+    // Show button when filters are active
     const observer = new MutationObserver(function (mutations) {
       mutations.forEach(function (mutation) {
         if (
@@ -183,8 +195,17 @@
           mutation.attributeName === "style" &&
           KM77.filterStatusDiv
         ) {
+          // Check if there's more to load before showing button
+          const pagedContent = document.querySelector(".js-paged-content");
+          const hasMoreContent =
+            pagedContent &&
+            pagedContent.getAttribute("data-paged-content-next-url");
+
+          // Only show the button if there are filters active and more content available
           loadMoreButton.style.display =
-            KM77.filterStatusDiv.style.display === "block" ? "block" : "none";
+            KM77.filterStatusDiv.style.display === "block" && hasMoreContent
+              ? "block"
+              : "none";
         }
       });
     });
@@ -192,6 +213,46 @@
     if (KM77.filterStatusDiv) {
       observer.observe(KM77.filterStatusDiv, { attributes: true });
     }
+
+    // Also check when paged content attributes change
+    const pagedContentObserver = new MutationObserver(function () {
+      // Check if there's more to load
+      const pagedContent = document.querySelector(".js-paged-content");
+      const hasMoreContent =
+        pagedContent &&
+        pagedContent.getAttribute("data-paged-content-next-url");
+
+      // Only show when filters are active and there's more content
+      if (
+        KM77.filterStatusDiv &&
+        KM77.filterStatusDiv.style.display === "block"
+      ) {
+        loadMoreButton.style.display = hasMoreContent ? "block" : "none";
+      }
+    });
+
+    const pagedContent = document.querySelector(".js-paged-content");
+    if (pagedContent) {
+      pagedContentObserver.observe(pagedContent, {
+        attributes: true,
+        attributeFilter: ["data-paged-content-next-url"],
+      });
+    }
+
+    // Check scroll position every few seconds to update button visibility
+    setInterval(() => {
+      if (
+        KM77.filterStatusDiv &&
+        KM77.filterStatusDiv.style.display === "block"
+      ) {
+        const pagedContent = document.querySelector(".js-paged-content");
+        const hasMoreContent =
+          pagedContent &&
+          pagedContent.getAttribute("data-paged-content-next-url");
+
+        loadMoreButton.style.display = hasMoreContent ? "block" : "none";
+      }
+    }, 3000);
   }
 
   // Initialize when DOM content is loaded

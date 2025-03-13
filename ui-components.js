@@ -54,15 +54,20 @@ const KM77UI = (function () {
       KM77.filterStatusDiv.style.display = "block";
       KM77.filterStatusDiv.innerHTML = `Filtro aplicado: Ocultando ${hidden} de ${total} coches`;
 
-      // Add a load more link if needed
+      // Add a more visible load more link
       if (!KM77.filterStatusDiv.querySelector(".load-more-link")) {
         const loadMoreLink = document.createElement("a");
         loadMoreLink.href = "#";
         loadMoreLink.className = "load-more-link";
         loadMoreLink.textContent = " [Cargar más]";
-        loadMoreLink.style.color = "#fff";
-        loadMoreLink.style.textDecoration = "underline";
-        loadMoreLink.style.marginLeft = "5px";
+        loadMoreLink.style.cssText = `
+          color: #fff;
+          text-decoration: underline;
+          margin-left: 5px;
+          font-weight: bold;
+          cursor: pointer;
+        `;
+
         loadMoreLink.addEventListener("click", function (e) {
           e.preventDefault();
           if (
@@ -70,28 +75,71 @@ const KM77UI = (function () {
             typeof KM77FilterManager.triggerLoadMore === "function"
           ) {
             KM77FilterManager.triggerLoadMore();
+            loadMoreLink.textContent = " [Cargando...]";
+            setTimeout(() => {
+              loadMoreLink.textContent = " [Cargar más]";
+            }, 2000);
           }
         });
+
         KM77.filterStatusDiv.appendChild(loadMoreLink);
+      }
+
+      // Add an auto-load toggle
+      if (!KM77.filterStatusDiv.querySelector(".auto-load-toggle")) {
+        const toggleContainer = document.createElement("div");
+        toggleContainer.style.marginTop = "5px";
+
+        const autoLoadCheckbox = document.createElement("input");
+        autoLoadCheckbox.type = "checkbox";
+        autoLoadCheckbox.id = "km77-auto-load";
+        autoLoadCheckbox.checked =
+          localStorage.getItem("km77AutoLoad") !== "false";
+
+        const autoLoadLabel = document.createElement("label");
+        autoLoadLabel.htmlFor = "km77-auto-load";
+        autoLoadLabel.textContent = " Auto-cargar más resultados";
+        autoLoadLabel.style.marginLeft = "5px";
+        autoLoadLabel.style.cursor = "pointer";
+        autoLoadLabel.style.fontWeight = "normal";
+
+        toggleContainer.appendChild(autoLoadCheckbox);
+        toggleContainer.appendChild(autoLoadLabel);
+
+        // When toggled, save preference
+        autoLoadCheckbox.addEventListener("change", function () {
+          localStorage.setItem("km77AutoLoad", this.checked);
+
+          // Immediately check if we need to load more
+          if (this.checked) {
+            setTimeout(() => {
+              KM77FilterManager.checkScrollPositionForLoadMore();
+            }, 500);
+          }
+        });
+
+        KM77.filterStatusDiv.appendChild(toggleContainer);
+        KM77.filterStatusDiv.classList.add("with-auto-load");
       }
     } else {
       KM77.filterStatusDiv.style.display = "none";
     }
   }
 
-  // Update processing status function
+  // Update processing status function with improved loading indicator
   function updateStatus(processed, total) {
     if (!KM77.statusDiv) return;
 
     const percent = Math.round((processed / total) * 100);
     KM77.statusDiv.innerHTML = `Procesando: ${processed}/${total} (${percent}%)`;
+    KM77.statusDiv.style.display = "block";
 
     if (processed >= total) {
       if (KM77.statusDiv.getAttribute("data-completed") === "true") {
         // Already marked as complete, can hide
         setTimeout(() => {
           KM77.statusDiv.style.display = "none";
-        }, 5000);
+        }, 3000);
       } else {
         KM77.statusDiv.innerHTML += "<br>¡Completado!";
         KM77.statusDiv.setAttribute("data-completed", "true");
@@ -108,11 +156,30 @@ const KM77UI = (function () {
             KM77.statusDiv.removeAttribute("data-completed");
             updateStatus(KM77.processedCount, currentTotal);
           }
-        }, 5000);
+        }, 3000);
       }
     } else {
       KM77.statusDiv.removeAttribute("data-completed");
     }
+  }
+
+  // Display a temporary message
+  function showMessage(message, duration = 3000) {
+    if (!KM77.statusDiv) return;
+
+    const previousContent = KM77.statusDiv.innerHTML;
+    const wasHidden = KM77.statusDiv.style.display === "none";
+
+    KM77.statusDiv.innerHTML = message;
+    KM77.statusDiv.style.display = "block";
+
+    setTimeout(() => {
+      if (wasHidden) {
+        KM77.statusDiv.style.display = "none";
+      } else {
+        KM77.statusDiv.innerHTML = previousContent;
+      }
+    }, duration);
   }
 
   // Public API
@@ -120,5 +187,6 @@ const KM77UI = (function () {
     createStatusElements: createStatusElements,
     updateFilterStatus: updateFilterStatus,
     updateStatus: updateStatus,
+    showMessage: showMessage,
   };
 })();

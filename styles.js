@@ -118,6 +118,47 @@ const KM77Styles = (function () {
         background-color: #e9ecef;
         transition: background-color 0.2s;
       }
+      
+      /* Enhanced button styles */
+      .km77-load-more {
+        transition: all 0.3s ease;
+        border: none;
+      }
+      
+      .km77-load-more:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+      }
+      
+      .km77-load-more:active {
+        transform: translateY(1px);
+      }
+      
+      /* Filter status with auto-load option */
+      #km77-filter-status.with-auto-load {
+        padding-bottom: 15px;
+      }
+      
+      /* Improved loading indicator */
+      .load-more-link {
+        animation: pulse 1.5s infinite;
+      }
+      
+      @keyframes pulse {
+        0% { opacity: 1; }
+        50% { opacity: 0.7; }
+        100% { opacity: 1; }
+      }
+      
+      /* Better visibility for status messages */
+      #km77-status, #km77-filter-status {
+        transition: opacity 0.3s ease;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+      }
+      
+      #km77-status:hover, #km77-filter-status:hover {
+        opacity: 1 !important;
+      }
     `;
 
     document.head.appendChild(style);
