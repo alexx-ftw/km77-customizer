@@ -1,12 +1,13 @@
 // ==UserScript==
 // @name        KM77 Speaker Detector
-// @namespace   https://github.com/user/km77-speaker-detector
+// @namespace   https://github.com/alexx-ftw/km77-customizer
 // @match       https://www.km77.com/*
 // @grant       GM_xmlhttpRequest
 // @connect     www.km77.com
 // @version     1.1
 // @author      -
 // @description Detects '6 Altavoces' in car listings on km77.com
+// @downloadUrl https://github.com/alexx-ftw/km77-customizer/blob/main/javascript_og.js
 // ==/UserScript==
 
 (function () {
