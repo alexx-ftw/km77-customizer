@@ -10,4 +10,5 @@ Make sure file name extensions are not duplicated by mistake.
 Make sure _not_ to add code block markers at the end of files, unless really intended.
 Do not create any new files without explcitly asking the user for permission.
 
-When editing a module file, modify its version in the Core file.
+When editing a module file, modify its version in the Core file. For example, edit the "?v=yymmddhhmm" after the file name:
+"// @require https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/filter-manager.js?v=2503131710"

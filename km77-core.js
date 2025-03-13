@@ -10,9 +10,9 @@
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/table-manager.js
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/speaker-detector.js
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/performance-detector.js
-// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/filter-manager.js
+// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/filter-manager.js?v=2503131710
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/ui-components.js
-// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/styles.js
+// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/styles.js?v=2503131710
 // @downloadUrl https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/km77-core.js
 // ==/UserScript==
 
