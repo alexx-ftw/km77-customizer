@@ -92,9 +92,10 @@ const KM77FilterCore = (function () {
     // Update filter status
     KM77UI.updateFilterStatus(hiddenCount, rows.length);
 
-    // Check if there are few visible items and we should load more immediately
+    // Calculate visible row count
     const visibleRowCount = rows.length - hiddenCount;
-    // Modified condition: Load more if NO rows are visible OR if very few are visible
+
+    // Check if there are few visible items or NO visible items
     const shouldLoadMore =
       (visibleRowCount === 0 || visibleRowCount < 10) && rows.length > 0;
 
