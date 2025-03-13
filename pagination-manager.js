@@ -18,9 +18,23 @@ const KM77PaginationManager = (function () {
       const scrollPosition = window.scrollY + window.innerHeight;
       const documentHeight = document.documentElement.scrollHeight;
 
-      // If we're within 500px of the bottom or scrolled to bottom, try to trigger load more
+      // Count visible rows to determine if we need to load more
+      const visibleRows = Array.from(
+        KM77.mainTable.querySelectorAll("tbody tr.search")
+      ).filter((row) => row.style.display !== "none");
+
+      // Get the position of the last visible row if available
+      let lastRowPosition = documentHeight;
+      if (visibleRows.length > 0) {
+        const lastVisibleRow = visibleRows[visibleRows.length - 1];
+        const rect = lastVisibleRow.getBoundingClientRect();
+        lastRowPosition = window.scrollY + rect.bottom;
+      }
+
+      // If we're within 800px of the bottom or last visible row, try to trigger load more
       if (
-        documentHeight - scrollPosition < 500 ||
+        documentHeight - scrollPosition < 800 ||
+        scrollPosition + window.innerHeight >= lastRowPosition - 200 ||
         scrollPosition + 5 >= documentHeight
       ) {
         triggerLoadMore();
@@ -48,11 +62,14 @@ const KM77PaginationManager = (function () {
           const lastVisibleRow = visibleRows[visibleRows.length - 1];
           const rect = lastVisibleRow.getBoundingClientRect();
 
-          // If the last visible row is within viewport, try to load more
-          if (rect.bottom <= window.innerHeight + 300) {
-            // Don't trigger too frequently - limit to once every 5 seconds
+          // If the last visible row is within viewport or we have few visible rows, try to load more
+          if (
+            rect.bottom <= window.innerHeight + 500 ||
+            visibleRows.length < 12
+          ) {
+            // Don't trigger too frequently - limit to once every 3 seconds
             const now = Date.now();
-            if (now - lastAttemptTime > 5000) {
+            if (now - lastAttemptTime > 3000) {
               lastAttemptTime = now;
               console.log(
                 "KM77 Customizer: Auto-triggering load more from interval checker"
@@ -61,7 +78,7 @@ const KM77PaginationManager = (function () {
             }
           }
         }
-      }, 2000); // Check every 2 seconds
+      }, 1500); // Check every 1.5 seconds
     }
   }
 
@@ -86,6 +103,9 @@ const KM77PaginationManager = (function () {
         KM77.statusDiv.style.display = "block";
         KM77.statusDiv.removeAttribute("data-completed");
       }
+
+      // Update paged content loading state to prevent multiple simultaneous loads
+      pagedContent.setAttribute("data-paged-content-loading", "true");
 
       // Strategy 1: Try to find and click the load more button if it exists
       const loadMoreButton = document.querySelector(
@@ -132,6 +152,18 @@ const KM77PaginationManager = (function () {
                   console.log("KM77 Customizer: Found paged content instance, calling loadMore()");
                   instances[0].loadMore();
                   return;
+                }
+              }
+              
+              // Direct way to simulate pagination click if we find the elements
+              const paginationLinks = document.querySelectorAll('a.page-link');
+              if (paginationLinks.length > 0) {
+                for (let link of paginationLinks) {
+                  if (link.getAttribute('rel') === 'next' || link.textContent.includes('›')) {
+                    console.log("KM77 Customizer: Found pagination link, clicking it");
+                    link.click();
+                    return;
+                  }
                 }
               }
               
@@ -184,17 +216,35 @@ const KM77PaginationManager = (function () {
                           );
                         }
                         
+                        // Reset loading state
+                        pagedContent.setAttribute('data-paged-content-loading', 'false');
+                        
                         // Dispatch event to signal new content
                         document.dispatchEvent(new CustomEvent('km77NewRowsAdded', {
                           detail: { count: newRows.length }
                         }));
                       }
+                    } else {
+                      // Reset loading state if no rows found
+                      pagedContent.setAttribute('data-paged-content-loading', 'false');
                     }
                   })
-                  .catch(err => console.error("KM77 Customizer: Error fetching more content:", err));
+                  .catch(err => {
+                    console.error("KM77 Customizer: Error fetching more content:", err);
+                    // Reset loading state on error
+                    pagedContent.setAttribute('data-paged-content-loading', 'false');
+                  });
+              } else {
+                // Reset loading state if no next URL
+                pagedContent.setAttribute('data-paged-content-loading', 'false');
               }
             } catch (e) {
               console.error("KM77 Customizer: Error in load more script:", e);
+              // Reset loading state on exception
+              const pagedContent = document.querySelector(".js-paged-content");
+              if (pagedContent) {
+                pagedContent.setAttribute('data-paged-content-loading', 'false');
+              }
             }
           `;
           document.body.appendChild(injectScript);
@@ -211,6 +261,10 @@ const KM77PaginationManager = (function () {
             "KM77 Customizer: Error injecting load more script:",
             error
           );
+          // Reset loading state on error
+          if (pagedContent) {
+            pagedContent.setAttribute("data-paged-content-loading", "false");
+          }
         }
       }, 300);
     }
@@ -228,7 +282,8 @@ const KM77PaginationManager = (function () {
     // If the URL hasn't changed, our load attempts failed
     if (currentNextUrl === previousNextUrl) {
       console.log("KM77 Customizer: Load more failed, trying direct fetch");
-
+      // Reset loading state
+      pagedContent.setAttribute("data-paged-content-loading", "false");
       // Attempt a direct fetch as last resort
       fetchMoreContentDirectly(previousNextUrl);
     } else {
@@ -338,11 +393,32 @@ const KM77PaginationManager = (function () {
 
   // Setup scroll monitoring for load more functionality
   function setupScrollMonitoring() {
-    // Throttled scroll handler to avoid performance issues
+    // More responsive scroll handler with improved throttling
     let scrollTimeout;
+    let lastScrollTime = 0;
+    const throttleDelay = 100; // ms
+
     window.addEventListener("scroll", function () {
+      const now = Date.now();
+
+      // If we're actively scrolling, use throttling to avoid excessive checks
+      if (now - lastScrollTime < throttleDelay) {
+        if (scrollTimeout) clearTimeout(scrollTimeout);
+        scrollTimeout = setTimeout(
+          checkScrollPositionForLoadMore,
+          throttleDelay
+        );
+        return;
+      }
+
+      lastScrollTime = now;
+      checkScrollPositionForLoadMore();
+    });
+
+    // Also check when window is resized
+    window.addEventListener("resize", function () {
       if (scrollTimeout) clearTimeout(scrollTimeout);
-      scrollTimeout = setTimeout(checkScrollPositionForLoadMore, 150);
+      scrollTimeout = setTimeout(checkScrollPositionForLoadMore, 200);
     });
 
     // Listen for custom event when new rows are manually added

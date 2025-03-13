@@ -74,10 +74,22 @@ const KM77FilterCore = (function () {
     // Update filter status
     KM77UI.updateFilterStatus(hiddenCount, rows.length);
 
+    // Check if there are few visible items and we should load more immediately
+    const visibleRowCount = rows.length - hiddenCount;
+    const shouldLoadMore = visibleRowCount < 10 && hiddenCount > 0;
+
     // Check if we need to trigger load more after applying filters
     setTimeout(() => {
       if (KM77PaginationManager) {
         KM77PaginationManager.checkScrollPositionForLoadMore();
+
+        // Auto-load more content if too few visible items
+        if (shouldLoadMore) {
+          console.log(
+            "KM77 Customizer: Auto-loading more due to few visible items"
+          );
+          KM77PaginationManager.triggerLoadMore();
+        }
       }
     }, 100);
 
