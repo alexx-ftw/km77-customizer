@@ -73,6 +73,9 @@ const KM77FilterManager = (function () {
 
     // Update filter status
     KM77UI.updateFilterStatus(hiddenCount, rows.length);
+
+    // Check if we need to trigger load more after applying filters
+    setTimeout(checkScrollPositionForLoadMore, 100);
   }
 
   // Function to apply filter to a single row
@@ -669,6 +672,61 @@ const KM77FilterManager = (function () {
     header.appendChild(speakerFilterContainer);
   }
 
+  // Function to check scroll position and trigger "load more" if needed
+  function checkScrollPositionForLoadMore() {
+    // Only check if filters are active (some content is hidden)
+    if (
+      KM77.filterStatusDiv &&
+      KM77.filterStatusDiv.style.display === "block"
+    ) {
+      const scrollPosition = window.scrollY + window.innerHeight;
+      const documentHeight = document.documentElement.scrollHeight;
+
+      // If we're within 500px of the bottom, try to trigger load more
+      if (documentHeight - scrollPosition < 500) {
+        // Try to find the load more trigger
+        const pagedContent = document.querySelector(".js-paged-content");
+        if (pagedContent) {
+          // Check if there's more content to load
+          const nextUrl = pagedContent.getAttribute(
+            "data-paged-content-next-url"
+          );
+          const isLoading =
+            pagedContent.getAttribute("data-paged-content-loading") === "true";
+
+          if (nextUrl && !isLoading) {
+            console.log("KM77 Customizer: Manually triggering load more");
+
+            // Simulate scroll to the very bottom to trigger loading
+            window.scrollTo({
+              top: documentHeight,
+              behavior: "smooth",
+            });
+
+            // If that doesn't work, try to trigger the event programmatically
+            setTimeout(() => {
+              // Create and dispatch a scroll event
+              const scrollEvent = new Event("scroll");
+              window.dispatchEvent(scrollEvent);
+            }, 100);
+          }
+        }
+      }
+    }
+  }
+
+  // Setup scroll monitoring for load more functionality
+  function setupScrollMonitoring() {
+    // Throttled scroll handler to avoid performance issues
+    let scrollTimeout;
+    window.addEventListener("scroll", function () {
+      if (scrollTimeout) clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(checkScrollPositionForLoadMore, 200);
+    });
+
+    console.log("KM77 Customizer: Scroll monitoring for load more initialized");
+  }
+
   // Public API
   return {
     applyFilters: applyFilters,
@@ -676,5 +734,6 @@ const KM77FilterManager = (function () {
     addSpeedFilterControls: addSpeedFilterControls,
     addAccelerationFilterControls: addAccelerationFilterControls,
     addSpeakerFilterControls: addSpeakerFilterControls,
+    setupScrollMonitoring: setupScrollMonitoring,
   };
 })();

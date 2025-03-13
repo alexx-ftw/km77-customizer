@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        KM77 Customizer
 // @namespace   https://github.com/alexx-ftw/km77-customizer
-// @version     2.0
+// @version     2.1
 // @author      alexx-ftw
 // @description Enhanced car listing viewer for km77.com with speaker detection and performance metrics
 // @match       https://www.km77.com/buscador*
@@ -10,9 +10,9 @@
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/table-manager.js
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/speaker-detector.js
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/performance-detector.js
-// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/filter-manager.js?v=2503131710
-// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/ui-components.js
-// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/styles.js?v=2503131710
+// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/filter-manager.js?v=1
+// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/ui-components.js?v=1
+// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/styles.js?v=1
 // @downloadUrl https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/km77-core.js
 // ==/UserScript==
 
@@ -136,6 +136,9 @@
 
     // Set up observers for dynamic content
     KM77TableManager.setupObservers();
+
+    // Initialize scroll monitoring for load more functionality
+    KM77FilterManager.setupScrollMonitoring();
 
     // Initial processing of existing rows
     KM77TableManager.processExistingRows();
