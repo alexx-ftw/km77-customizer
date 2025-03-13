@@ -44,6 +44,342 @@ const KM77UI = (function () {
     // Store references
     KM77.statusDiv = statusDiv;
     KM77.filterStatusDiv = filterStatusDiv;
+
+    // Create master filter toggle button
+    createMasterFilterToggle();
+  }
+
+  // Create master filter toggle button
+  function createMasterFilterToggle() {
+    const masterToggleButton = document.createElement("button");
+    masterToggleButton.id = "km77-master-filter-toggle";
+    masterToggleButton.className = "btn btn-primary";
+    masterToggleButton.style.cssText = `
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      z-index: 9999;
+      font-size: 14px;
+      padding: 5px 10px;
+      opacity: 0.9;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+    `;
+
+    // Set button state based on localStorage
+    const allFiltersDisabled =
+      localStorage.getItem("km77AllFiltersDisabled") === "true";
+    updateMasterToggleButtonState(masterToggleButton, allFiltersDisabled);
+
+    // Add event listener for toggle action
+    masterToggleButton.addEventListener("click", () => {
+      toggleAllFilters(masterToggleButton);
+    });
+
+    document.body.appendChild(masterToggleButton);
+    KM77.masterToggleButton = masterToggleButton;
+  }
+
+  // Toggle all filters on/off
+  function toggleAllFilters(button) {
+    // Check current state
+    const allFiltersDisabled =
+      localStorage.getItem("km77AllFiltersDisabled") === "true";
+
+    if (allFiltersDisabled) {
+      // Re-enable all filters with previous states
+      enableAllFilters();
+      localStorage.setItem("km77AllFiltersDisabled", "false");
+    } else {
+      // Store current states before disabling
+      storeCurrentFilterStates();
+
+      // Disable all filters
+      disableAllFilters();
+      localStorage.setItem("km77AllFiltersDisabled", "true");
+    }
+
+    // Update button appearance
+    updateMasterToggleButtonState(button, !allFiltersDisabled);
+
+    // Apply filter changes
+    KM77FilterCore.applyFilters();
+  }
+
+  // Store all current filter states before disabling
+  function storeCurrentFilterStates() {
+    // Store speaker filter state
+    localStorage.setItem(
+      "km77PreviousSpeakerFiltersDisabled",
+      KM77.filtersDisabled
+    );
+    localStorage.setItem(
+      "km77PreviousSpeakerFilterValue",
+      KM77.currentFilterValue
+    );
+
+    // Store speed filter state
+    localStorage.setItem(
+      "km77PreviousSpeedFilterEnabled",
+      KM77.speedFilterEnabled
+    );
+    localStorage.setItem(
+      "km77PreviousSpeedFilterValue",
+      KM77.currentSpeedFilterValue
+    );
+
+    // Store acceleration filter state
+    localStorage.setItem(
+      "km77PreviousAccelFilterEnabled",
+      KM77.accelFilterEnabled
+    );
+    localStorage.setItem(
+      "km77PreviousAccelFilterValue",
+      KM77.currentAccelFilterValue
+    );
+
+    // Store cylinder filter state
+    localStorage.setItem(
+      "km77PreviousCylinderFilterEnabled",
+      KM77.cylinderFilterEnabled
+    );
+    localStorage.setItem(
+      "km77PreviousCylinderFilterValue",
+      KM77.currentCylinderFilterValue
+    );
+  }
+
+  // Disable all filters
+  function disableAllFilters() {
+    // Disable speaker filter
+    KM77.filtersDisabled = true;
+    localStorage.setItem("km77SpeakerFiltersDisabled", "true");
+
+    // Disable speed filter
+    KM77.speedFilterEnabled = false;
+    localStorage.setItem("km77SpeedFilterEnabled", "false");
+    KM77.currentSpeedFilterValue = 0;
+    localStorage.setItem("km77SpeedFilterValue", "0");
+
+    // Disable acceleration filter
+    KM77.accelFilterEnabled = false;
+    localStorage.setItem("km77AccelFilterEnabled", "false");
+    KM77.currentAccelFilterValue = 0;
+    localStorage.setItem("km77AccelFilterValue", "0");
+
+    // Disable cylinder filter
+    KM77.cylinderFilterEnabled = false;
+    localStorage.setItem("km77CylinderFilterEnabled", "false");
+    KM77.currentCylinderFilterValue = 0;
+    localStorage.setItem("km77CylinderFilterValue", "0");
+
+    // Update UI controls if they exist
+    updateFilterUIControls(true);
+  }
+
+  // Enable all filters with their previous states
+  function enableAllFilters() {
+    // Restore speaker filter state
+    KM77.filtersDisabled =
+      localStorage.getItem("km77PreviousSpeakerFiltersDisabled") === "true";
+    const speakerValue = parseInt(
+      localStorage.getItem("km77PreviousSpeakerFilterValue") || "6"
+    );
+    KM77.currentFilterValue = speakerValue;
+    localStorage.setItem("km77SpeakerFiltersDisabled", KM77.filtersDisabled);
+    localStorage.setItem("km77SpeakerFilterValue", speakerValue.toString());
+
+    // Restore speed filter state
+    KM77.speedFilterEnabled =
+      localStorage.getItem("km77PreviousSpeedFilterEnabled") === "true";
+    const speedValue = parseInt(
+      localStorage.getItem("km77PreviousSpeedFilterValue") || "140"
+    );
+    KM77.currentSpeedFilterValue = speedValue;
+    localStorage.setItem("km77SpeedFilterEnabled", KM77.speedFilterEnabled);
+    localStorage.setItem("km77SpeedFilterValue", speedValue.toString());
+
+    // Restore acceleration filter state
+    KM77.accelFilterEnabled =
+      localStorage.getItem("km77PreviousAccelFilterEnabled") === "true";
+    const accelValue = parseFloat(
+      localStorage.getItem("km77PreviousAccelFilterValue") || "8"
+    );
+    KM77.currentAccelFilterValue = accelValue;
+    localStorage.setItem("km77AccelFilterEnabled", KM77.accelFilterEnabled);
+    localStorage.setItem("km77AccelFilterValue", accelValue.toString());
+
+    // Restore cylinder filter state
+    KM77.cylinderFilterEnabled =
+      localStorage.getItem("km77PreviousCylinderFilterEnabled") === "true";
+    const cylinderValue = parseInt(
+      localStorage.getItem("km77PreviousCylinderFilterValue") || "4"
+    );
+    KM77.currentCylinderFilterValue = cylinderValue;
+    localStorage.setItem(
+      "km77CylinderFilterEnabled",
+      KM77.cylinderFilterEnabled
+    );
+    localStorage.setItem("km77CylinderFilterValue", cylinderValue.toString());
+
+    // Update UI controls if they exist
+    updateFilterUIControls(false);
+  }
+
+  // Update UI controls to reflect current filter states
+  function updateFilterUIControls(allDisabled) {
+    try {
+      // Update speaker filter UI
+      const speakerHeader = document.querySelector(".speaker-header");
+      if (speakerHeader) {
+        const speakerToggle = speakerHeader.querySelector(
+          ".btn-sm.btn-danger, .btn-sm.btn-success"
+        );
+        const speakerSlider = speakerHeader.querySelector(
+          "input[type='range']"
+        );
+        const speakerValueDisplay =
+          speakerHeader.querySelector(".slider-value");
+        const speakerButtons = speakerHeader.querySelectorAll(".slider-button");
+        const speakerResetBtn = speakerHeader.querySelector(
+          "button.btn-secondary"
+        );
+
+        if (speakerToggle && speakerSlider && speakerValueDisplay) {
+          // Update speaker filter controls
+          if (allDisabled || KM77.filtersDisabled) {
+            speakerToggle.textContent = "Enable Filters";
+            speakerToggle.className = "btn btn-sm btn-success";
+            speakerValueDisplay.textContent = "OFF";
+            speakerSlider.disabled = true;
+            speakerButtons.forEach((btn) => (btn.disabled = true));
+            if (speakerResetBtn) speakerResetBtn.disabled = true;
+          } else {
+            speakerToggle.textContent = "Disable Filters";
+            speakerToggle.className = "btn btn-sm btn-danger";
+            speakerValueDisplay.textContent = `${KM77.currentFilterValue}+`;
+            speakerSlider.value = KM77.currentFilterValue.toString();
+            speakerSlider.disabled = false;
+            speakerButtons.forEach((btn) => (btn.disabled = false));
+            if (speakerResetBtn) speakerResetBtn.disabled = false;
+          }
+        }
+      }
+
+      // Similar updates for speed, acceleration, and cylinder filter UIs
+      updateSpeedFilterUI(allDisabled);
+      updateAccelerationFilterUI(allDisabled);
+      updateCylinderFilterUI(allDisabled);
+    } catch (e) {
+      console.error("KM77 Customizer: Error updating filter UI controls", e);
+    }
+  }
+
+  // Update speed filter UI
+  function updateSpeedFilterUI(allDisabled) {
+    const speedHeader = document.querySelector(".speed-header");
+    if (speedHeader) {
+      const toggle = speedHeader.querySelector(
+        ".btn-sm.btn-danger, .btn-sm.btn-success"
+      );
+      const slider = speedHeader.querySelector("input[type='range']");
+      const valueDisplay = speedHeader.querySelector(".slider-value");
+      const buttons = speedHeader.querySelectorAll(".slider-button");
+
+      if (toggle && slider && valueDisplay) {
+        if (allDisabled || !KM77.speedFilterEnabled) {
+          toggle.textContent = "Filtrar";
+          toggle.className = "btn btn-sm btn-success";
+          valueDisplay.textContent = "OFF";
+          slider.disabled = true;
+          buttons.forEach((btn) => (btn.disabled = true));
+        } else {
+          toggle.textContent = "Quitar";
+          toggle.className = "btn btn-sm btn-danger";
+          valueDisplay.textContent = `${KM77.currentSpeedFilterValue}+`;
+          slider.value = KM77.currentSpeedFilterValue.toString();
+          slider.disabled = false;
+          buttons.forEach((btn) => (btn.disabled = false));
+        }
+      }
+    }
+  }
+
+  // Update acceleration filter UI
+  function updateAccelerationFilterUI(allDisabled) {
+    const accelHeader = document.querySelector(".accel-header");
+    if (accelHeader) {
+      const toggle = accelHeader.querySelector(
+        ".btn-sm.btn-danger, .btn-sm.btn-success"
+      );
+      const slider = accelHeader.querySelector("input[type='range']");
+      const valueDisplay = accelHeader.querySelector(".slider-value");
+      const buttons = accelHeader.querySelectorAll(".slider-button");
+
+      if (toggle && slider && valueDisplay) {
+        if (allDisabled || !KM77.accelFilterEnabled) {
+          toggle.textContent = "Filtrar";
+          toggle.className = "btn btn-sm btn-success";
+          valueDisplay.textContent = "OFF";
+          slider.disabled = true;
+          buttons.forEach((btn) => (btn.disabled = true));
+        } else {
+          toggle.textContent = "Quitar";
+          toggle.className = "btn btn-sm btn-danger";
+          valueDisplay.textContent = `${KM77.currentAccelFilterValue}-`;
+          slider.value = KM77.currentAccelFilterValue.toString();
+          slider.disabled = false;
+          buttons.forEach((btn) => (btn.disabled = false));
+        }
+      }
+    }
+  }
+
+  // Update cylinder filter UI
+  function updateCylinderFilterUI(allDisabled) {
+    const cylinderHeader = document.querySelector(".cylinder-header");
+    if (cylinderHeader) {
+      const toggle = cylinderHeader.querySelector(
+        ".btn-sm.btn-danger, .btn-sm.btn-success"
+      );
+      const valueDisplay = cylinderHeader.querySelector(".slider-value");
+      const buttons = cylinderHeader.querySelectorAll(".btn-group button");
+
+      if (toggle && valueDisplay) {
+        if (allDisabled || !KM77.cylinderFilterEnabled) {
+          toggle.textContent = "Filtrar";
+          toggle.className = "btn btn-sm btn-success";
+          valueDisplay.textContent = "OFF";
+          buttons.forEach((btn) => (btn.disabled = true));
+        } else {
+          toggle.textContent = "Quitar";
+          toggle.className = "btn btn-sm btn-danger";
+          valueDisplay.textContent = `${KM77.currentCylinderFilterValue}+`;
+          buttons.forEach((btn) => (btn.disabled = false));
+
+          // Update active button
+          buttons.forEach((btn) => {
+            if (parseInt(btn.textContent) === KM77.currentCylinderFilterValue) {
+              btn.classList.remove("btn-outline-secondary");
+              btn.classList.add("btn-secondary");
+            } else {
+              btn.classList.remove("btn-secondary");
+              btn.classList.add("btn-outline-secondary");
+            }
+          });
+        }
+      }
+    }
+  }
+
+  // Update master toggle button appearance based on state
+  function updateMasterToggleButtonState(button, disabled) {
+    if (disabled) {
+      button.textContent = "Enable All Filters";
+      button.className = "btn btn-success";
+    } else {
+      button.textContent = "Disable All Filters";
+      button.className = "btn btn-danger";
+    }
   }
 
   // Update filter status function
@@ -188,5 +524,7 @@ const KM77UI = (function () {
     updateFilterStatus: updateFilterStatus,
     updateStatus: updateStatus,
     showMessage: showMessage,
+    toggleAllFilters: toggleAllFilters,
+    updateFilterUIControls: updateFilterUIControls,
   };
 })();
