@@ -1,13 +1,18 @@
 // ==UserScript==
 // @name        KM77 Customizer
 // @namespace   https://github.com/alexx-ftw/km77-customizer
-// @version     2.3
+// @version     2.4
 // @author      alexx-ftw
 // @description Enhanced car listing viewer for km77.com with speaker detection and performance metrics
 // @match       https://www.km77.com/buscador*
 // @grant       GM_xmlhttpRequest
 // @connect     www.km77.com
-// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/table-manager.js
+// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/row-processor.js?v=1
+// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/header-manager.js?v=1
+// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/table-merger.js?v=1
+// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/sort-manager.js?v=1
+// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/observer-manager.js?v=1
+// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/table-manager.js?v=1
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/speaker-detector.js
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/performance-detector.js
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/filter-core.js?v=2
