@@ -155,7 +155,9 @@ const KM77FilterManager = (function () {
     // Create speed slider value display
     const numberDisplay = document.createElement("span");
     numberDisplay.className = "slider-value clickable";
-    numberDisplay.textContent = "OFF";
+    numberDisplay.textContent = KM77.speedFilterEnabled
+      ? `${KM77.currentSpeedFilterValue}+`
+      : "OFF";
     numberDisplay.style.marginRight = "5px";
     numberDisplay.title = "Click to edit";
 
@@ -219,10 +221,10 @@ const KM77FilterManager = (function () {
     slider.min = "100";
     slider.max = "300";
     slider.step = "10";
-    slider.value = "140"; // Default starting value
+    slider.value = KM77.currentSpeedFilterValue || "140"; // Use saved value or default
     slider.style.width = "80px";
     slider.style.marginRight = "5px";
-    slider.disabled = true;
+    slider.disabled = !KM77.speedFilterEnabled;
 
     // Create speed decrease button
     const decreaseBtn = document.createElement("button");
@@ -230,7 +232,7 @@ const KM77FilterManager = (function () {
     decreaseBtn.className = "btn btn-sm btn-outline-secondary slider-button";
     decreaseBtn.style.padding = "0px 5px";
     decreaseBtn.style.marginRight = "3px";
-    decreaseBtn.disabled = true;
+    decreaseBtn.disabled = !KM77.speedFilterEnabled;
 
     // Create speed increase button
     const increaseBtn = document.createElement("button");
@@ -238,12 +240,14 @@ const KM77FilterManager = (function () {
     increaseBtn.className = "btn btn-sm btn-outline-secondary slider-button";
     increaseBtn.style.padding = "0px 5px";
     increaseBtn.style.marginLeft = "3px";
-    increaseBtn.disabled = true;
+    increaseBtn.disabled = !KM77.speedFilterEnabled;
 
     // Create speed filter toggle button
     const toggleBtn = document.createElement("button");
-    toggleBtn.textContent = "Filtrar";
-    toggleBtn.className = "btn btn-sm btn-success";
+    toggleBtn.textContent = KM77.speedFilterEnabled ? "Quitar" : "Filtrar";
+    toggleBtn.className = KM77.speedFilterEnabled
+      ? "btn btn-sm btn-danger"
+      : "btn btn-sm btn-success";
     toggleBtn.style.marginLeft = "5px";
 
     // Toggle speed filter functionality
@@ -259,13 +263,18 @@ const KM77FilterManager = (function () {
         toggleBtn.className = "btn btn-sm btn-success";
         numberDisplay.textContent = "OFF";
         KM77.currentSpeedFilterValue = 0;
+        localStorage.setItem("km77SpeedFilterValue", "0");
+        localStorage.setItem("km77SpeedFilterEnabled", "false");
       } else {
         // Turning on
         toggleBtn.textContent = "Quitar";
         toggleBtn.className = "btn btn-sm btn-danger";
         numberDisplay.textContent = `${slider.value}+`;
         KM77.currentSpeedFilterValue = parseInt(slider.value);
+        localStorage.setItem("km77SpeedFilterValue", slider.value);
+        localStorage.setItem("km77SpeedFilterEnabled", "true");
       }
+      KM77.speedFilterEnabled = !isEnabled;
       applyFilters();
     });
 
@@ -273,6 +282,7 @@ const KM77FilterManager = (function () {
     slider.addEventListener("input", () => {
       numberDisplay.textContent = `${slider.value}+`;
       KM77.currentSpeedFilterValue = parseInt(slider.value);
+      localStorage.setItem("km77SpeedFilterValue", slider.value);
       applyFilters();
     });
 
@@ -283,6 +293,7 @@ const KM77FilterManager = (function () {
         slider.value = currentValue - 10;
         numberDisplay.textContent = `${slider.value}+`;
         KM77.currentSpeedFilterValue = parseInt(slider.value);
+        localStorage.setItem("km77SpeedFilterValue", slider.value);
         applyFilters();
       }
     });
@@ -294,6 +305,7 @@ const KM77FilterManager = (function () {
         slider.value = (currentValue + 10).toString();
         numberDisplay.textContent = `${slider.value}+`;
         KM77.currentSpeedFilterValue = parseInt(slider.value);
+        localStorage.setItem("km77SpeedFilterValue", slider.value);
         applyFilters();
       }
     });
@@ -321,7 +333,9 @@ const KM77FilterManager = (function () {
     // Create acceleration slider value display
     const valueDisplay = document.createElement("span");
     valueDisplay.className = "slider-value clickable";
-    valueDisplay.textContent = "OFF";
+    valueDisplay.textContent = KM77.accelFilterEnabled
+      ? `${KM77.currentAccelFilterValue}-`
+      : "OFF";
     valueDisplay.style.marginRight = "5px";
     valueDisplay.title = "Click to edit";
 
@@ -386,10 +400,10 @@ const KM77FilterManager = (function () {
     slider.min = "3";
     slider.max = "15";
     slider.step = "0.5";
-    slider.value = "8"; // Default starting value
+    slider.value = KM77.currentAccelFilterValue || "8"; // Use saved value or default
     slider.style.width = "80px";
     slider.style.marginRight = "5px";
-    slider.disabled = true;
+    slider.disabled = !KM77.accelFilterEnabled;
 
     // Create acceleration decrease button
     const decreaseBtn = document.createElement("button");
@@ -397,7 +411,7 @@ const KM77FilterManager = (function () {
     decreaseBtn.className = "btn btn-sm btn-outline-secondary slider-button";
     decreaseBtn.style.padding = "0px 5px";
     decreaseBtn.style.marginRight = "3px";
-    decreaseBtn.disabled = true;
+    decreaseBtn.disabled = !KM77.accelFilterEnabled;
 
     // Create acceleration increase button
     const increaseBtn = document.createElement("button");
@@ -405,12 +419,14 @@ const KM77FilterManager = (function () {
     increaseBtn.className = "btn btn-sm btn-outline-secondary slider-button";
     increaseBtn.style.padding = "0px 5px";
     increaseBtn.style.marginLeft = "3px";
-    increaseBtn.disabled = true;
+    increaseBtn.disabled = !KM77.accelFilterEnabled;
 
     // Create acceleration filter toggle button
     const toggleBtn = document.createElement("button");
-    toggleBtn.textContent = "Filtrar";
-    toggleBtn.className = "btn btn-sm btn-success";
+    toggleBtn.textContent = KM77.accelFilterEnabled ? "Quitar" : "Filtrar";
+    toggleBtn.className = KM77.accelFilterEnabled
+      ? "btn btn-sm btn-danger"
+      : "btn btn-sm btn-success";
     toggleBtn.style.marginLeft = "5px";
 
     // Toggle acceleration filter functionality
@@ -426,13 +442,18 @@ const KM77FilterManager = (function () {
         toggleBtn.className = "btn btn-sm btn-success";
         valueDisplay.textContent = "OFF";
         KM77.currentAccelFilterValue = 0;
+        localStorage.setItem("km77AccelFilterValue", "0");
+        localStorage.setItem("km77AccelFilterEnabled", "false");
       } else {
         // Turning on
         toggleBtn.textContent = "Quitar";
         toggleBtn.className = "btn btn-sm btn-danger";
         valueDisplay.textContent = `${slider.value}-`;
         KM77.currentAccelFilterValue = parseFloat(slider.value);
+        localStorage.setItem("km77AccelFilterValue", slider.value);
+        localStorage.setItem("km77AccelFilterEnabled", "true");
       }
+      KM77.accelFilterEnabled = !isEnabled;
       applyFilters();
     });
 
@@ -440,6 +461,7 @@ const KM77FilterManager = (function () {
     slider.addEventListener("input", () => {
       valueDisplay.textContent = `${slider.value}-`;
       KM77.currentAccelFilterValue = parseFloat(slider.value);
+      localStorage.setItem("km77AccelFilterValue", slider.value);
       applyFilters();
     });
 
@@ -450,6 +472,7 @@ const KM77FilterManager = (function () {
         slider.value = (currentValue - 0.5).toFixed(1);
         valueDisplay.textContent = `${slider.value}-`;
         KM77.currentAccelFilterValue = parseFloat(slider.value);
+        localStorage.setItem("km77AccelFilterValue", slider.value);
         applyFilters();
       }
     });
@@ -461,6 +484,7 @@ const KM77FilterManager = (function () {
         slider.value = (currentValue + 0.5).toFixed(1);
         valueDisplay.textContent = `${slider.value}-`;
         KM77.currentAccelFilterValue = parseFloat(slider.value);
+        localStorage.setItem("km77AccelFilterValue", slider.value);
         applyFilters();
       }
     });
@@ -483,7 +507,9 @@ const KM77FilterManager = (function () {
     // Create slider value display
     const sliderValueDisplay = document.createElement("span");
     sliderValueDisplay.className = "slider-value clickable";
-    sliderValueDisplay.textContent = KM77.filtersDisabled ? "OFF" : "6+";
+    sliderValueDisplay.textContent = KM77.filtersDisabled
+      ? "OFF"
+      : `${KM77.currentFilterValue}+`;
     sliderValueDisplay.style.marginRight = "5px";
     sliderValueDisplay.title = "Click to edit";
 
@@ -560,7 +586,9 @@ const KM77FilterManager = (function () {
     filterSlider.type = "range";
     filterSlider.min = "0";
     filterSlider.max = "12"; // Typical maximum speaker count
-    filterSlider.value = KM77.filtersDisabled ? "0" : "6"; // Start at 6 or 0 if disabled
+    filterSlider.value = KM77.filtersDisabled
+      ? "0"
+      : KM77.currentFilterValue.toString(); // Use saved value
     filterSlider.style.width = "80px";
     filterSlider.style.marginRight = "5px";
     if (KM77.filtersDisabled) filterSlider.disabled = true;
@@ -577,6 +605,7 @@ const KM77FilterManager = (function () {
     filterSlider.addEventListener("input", () => {
       sliderValueDisplay.textContent = `${filterSlider.value}+`;
       KM77.currentFilterValue = parseInt(filterSlider.value);
+      localStorage.setItem("km77SpeakerFilterValue", filterSlider.value);
       applyFilters();
     });
 
@@ -587,6 +616,7 @@ const KM77FilterManager = (function () {
         filterSlider.value = currentValue - 1;
         sliderValueDisplay.textContent = `${filterSlider.value}+`;
         KM77.currentFilterValue = parseInt(filterSlider.value);
+        localStorage.setItem("km77SpeakerFilterValue", filterSlider.value);
         applyFilters();
       }
     });
@@ -598,6 +628,7 @@ const KM77FilterManager = (function () {
         filterSlider.value = currentValue + 1;
         sliderValueDisplay.textContent = `${filterSlider.value}+`;
         KM77.currentFilterValue = parseInt(filterSlider.value);
+        localStorage.setItem("km77SpeakerFilterValue", filterSlider.value);
         applyFilters();
       }
     });
@@ -614,6 +645,7 @@ const KM77FilterManager = (function () {
       filterSlider.value = "0";
       sliderValueDisplay.textContent = "0+";
       KM77.currentFilterValue = 0;
+      localStorage.setItem("km77SpeakerFilterValue", "0");
       applyFilters();
     });
 
@@ -1041,6 +1073,21 @@ const KM77FilterManager = (function () {
     );
   }
 
+  // Apply filters when initializing, based on saved states
+  function initializeFilters() {
+    // If we have saved filters that are active, apply them immediately
+    if (
+      (!KM77.filtersDisabled && KM77.currentFilterValue > 0) ||
+      KM77.speedFilterEnabled ||
+      KM77.accelFilterEnabled
+    ) {
+      setTimeout(() => {
+        console.log("KM77 Customizer: Applying saved filters");
+        applyFilters();
+      }, 1500); // Delay to ensure all rows are processed
+    }
+  }
+
   // Public API
   return {
     applyFilters: applyFilters,
@@ -1051,5 +1098,6 @@ const KM77FilterManager = (function () {
     setupScrollMonitoring: setupScrollMonitoring,
     triggerLoadMore: triggerLoadMore, // Export for manual triggering if needed
     checkScrollPositionForLoadMore: checkScrollPositionForLoadMore,
+    initializeFilters: initializeFilters, // New method to apply saved filters on init
   };
 })();
