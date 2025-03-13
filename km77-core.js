@@ -56,10 +56,74 @@
   window.KM77.mainTable = tableElement;
   window.KM77.mainTableBody = tableElement.querySelector("tbody");
 
+  // Function to make tables span full width
+  function setTableFullWidth() {
+    if (window.KM77.mainTable) {
+      // Apply full width to the table itself
+      window.KM77.mainTable.style.width = "100%";
+      window.KM77.mainTable.style.tableLayout = "fixed";
+
+      // Find and modify all container elements that might restrict width
+      const tableContainer = window.KM77.mainTable.closest(".table-responsive");
+      if (tableContainer) {
+        tableContainer.style.maxWidth = "none";
+        tableContainer.style.width = "100%";
+        tableContainer.style.overflowX = "visible"; // Prevent horizontal scrolling
+      }
+
+      // Modify the main container and its parent elements
+      const containers = document.querySelectorAll(
+        ".container, .mainbar, .result-list, .row"
+      );
+      containers.forEach((container) => {
+        container.style.maxWidth = "100%";
+        container.style.width = "100%";
+        container.style.paddingLeft = "5px";
+        container.style.paddingRight = "5px";
+      });
+
+      // Hide the sidebar to give more space to the table
+      const sidebar = document.querySelector(".sidebar");
+      if (sidebar) {
+        sidebar.style.display = "none";
+      }
+
+      // Optimize column widths
+      const headerCells = window.KM77.mainTable.querySelectorAll("thead th");
+      if (headerCells.length) {
+        // Adjust column widths based on content type
+        headerCells.forEach((cell, index) => {
+          // Make name column wider, numeric columns narrower
+          if (index === 1) {
+            // Name column
+            cell.style.width = "30%";
+          } else if (index > 1) {
+            // Numeric columns
+            cell.style.width = "10%";
+          } else if (index === 0) {
+            // Image column
+            cell.style.width = "8%";
+          }
+        });
+      }
+
+      // Prevent text overflow with wrapping for long content
+      const nameCells =
+        window.KM77.mainTable.querySelectorAll("td.vehicle-name");
+      nameCells.forEach((cell) => {
+        cell.classList.remove("text-nowrap");
+        cell.style.whiteSpace = "normal";
+      });
+    }
+  }
+
   // Initialize all modules
   function initializeModules() {
     // Add styles first
     KM77Styles.addStyles();
+
+    // Set table to full width
+    setTableFullWidth();
 
     // Create UI elements
     KM77UI.createStatusElements();
@@ -78,6 +142,12 @@
 
     // Perform initial merge if there are multiple tables
     setTimeout(KM77TableManager.mergeTables, 500);
+
+    // Re-apply full width after merging tables and DOM updates
+    setTimeout(setTableFullWidth, 600);
+
+    // Apply full width one more time after all loading is complete
+    setTimeout(setTableFullWidth, 1500);
   }
 
   // Initialize when DOM content is loaded
@@ -91,5 +161,6 @@
   window.addEventListener("load", function () {
     KM77TableManager.initializeHeaders();
     setTimeout(KM77TableManager.mergeTables, 1000);
+    setTimeout(setTableFullWidth, 1200);
   });
 })();
