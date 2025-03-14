@@ -10,5 +10,5 @@ Make sure file name extensions are not duplicated by mistake.
 Make sure _not_ to add code block markers at the end of files, unless really intended.
 Do not create any new files without explcitly asking the user for permission.
 
-When editing a module file, modify its version in the Core file by adding one to the already present version number, or add if missing:
+Extremely important: When editing a module file, modify its version in the Core file by adding one to the already present version number, or add if missing:
 "[...].js?v=1" -> "[...].js?v=2"
