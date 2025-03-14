@@ -1,4 +1,4 @@
-// KM77 Customizer - Pagination Manager Module - Version 8
+// KM77 Customizer - Pagination Manager Module - Version 9
 // Handles automatic loading of more content when filtering is active
 
 const KM77PaginationManager = (function () {
@@ -17,13 +17,15 @@ const KM77PaginationManager = (function () {
   let reachedEndOfContent = false;
 
   // Hard limits to prevent runaway loading
-  const ABSOLUTE_ROW_LIMIT = 300; // Stop loading after this many total rows
-  const ABSOLUTE_LOAD_LIMIT = 12; // Maximum number of loads regardless of session settings
+  const ABSOLUTE_ROW_LIMIT = 200; // Reduced from 300 to prevent overloading
+  const FIRST_BATCH_LIMIT = 30; // Stricter limit for first auto-load
+  const ABSOLUTE_LOAD_LIMIT = 8; // Reduced from 12 to prevent excessive loading
+  let isFirstAutoLoad = true;
 
   // Add loading control parameters
   const COOLDOWN_PERIOD = 5000; // 5 seconds between auto-load attempts
   const MAX_CONSECUTIVE_LOADS = 3; // Maximum consecutive auto-loads
-  const MAX_TOTAL_LOADS_PER_SESSION = 10; // Maximum loads per session
+  const MAX_TOTAL_LOADS_PER_SESSION = 6; // Reduced from 10 to prevent excessive loading
   let consecutiveLoadCount = 0;
   let totalLoadsThisSession = 0;
   let lastLoadTime = 0;
@@ -37,7 +39,7 @@ const KM77PaginationManager = (function () {
 
   // Safety timeout to force end after a certain period
   let safetyTimeout = null;
-  const SAFETY_TIMEOUT_DURATION = 45000; // 45 seconds max for a loading session
+  const SAFETY_TIMEOUT_DURATION = 30000; // Reduced from 45 seconds to 30 seconds
 
   // Track the previous content size to detect if we're actually getting new content
   let previousContentSize = 0;
@@ -46,6 +48,10 @@ const KM77PaginationManager = (function () {
 
   // Counter for the number of rows before any loading
   let initialRowCount = 0;
+
+  // Performance monitoring variables
+  let loadStartTime = 0;
+  const PERFORMANCE_THRESHOLD = 1500; // ms - if loading takes longer than this, it's too slow
 
   // Helper to get all currently visible rows
   function getVisibleRows() {
@@ -83,10 +89,13 @@ const KM77PaginationManager = (function () {
       return false;
     }
 
-    // Check if we've hit the absolute row limit
-    if (getTotalRowCount() >= ABSOLUTE_ROW_LIMIT) {
+    // For the first auto-load, apply a stricter row limit
+    const rowLimit = isFirstAutoLoad ? FIRST_BATCH_LIMIT : ABSOLUTE_ROW_LIMIT;
+
+    // Check if we've hit the row limit
+    if (getTotalRowCount() >= rowLimit) {
       console.log(
-        `KM77 Customizer: Reached absolute row limit (${ABSOLUTE_ROW_LIMIT}), stopping all loads`
+        `KM77 Customizer: Reached row limit (${rowLimit}), stopping loads`
       );
       setEndOfContentReached("Límite de filas alcanzado");
       return false;
@@ -144,9 +153,29 @@ const KM77PaginationManager = (function () {
       loadMoreCheckInterval = null;
     }
 
+    // Set up safety timeout to force end after a certain time
+    if (safetyTimeout) {
+      clearTimeout(safetyTimeout);
+    }
+
+    safetyTimeout = setTimeout(() => {
+      console.log(
+        `KM77 Customizer: Safety timeout reached after ${
+          SAFETY_TIMEOUT_DURATION / 1000
+        } seconds, stopping auto-load`
+      );
+      setEndOfContentReached("Tiempo máximo alcanzado");
+    }, SAFETY_TIMEOUT_DURATION);
+
     // Don't set up a new interval if we've reached the end or if no filters are active
     if (!isActive || reachedEndOfContent) {
       return;
+    }
+
+    // Store the initial row count when we start
+    if (initialRowCount === 0) {
+      initialRowCount = getTotalRowCount();
+      console.log(`KM77 Customizer: Initial row count: ${initialRowCount}`);
     }
 
     // Check if auto-load is enabled in settings
@@ -155,6 +184,9 @@ const KM77PaginationManager = (function () {
       console.log("KM77 Customizer: Auto-load disabled in settings");
       return;
     }
+
+    // Set up interval with a longer period for the first auto-load to prevent overloading
+    const intervalPeriod = isFirstAutoLoad ? 3000 : 2000;
 
     // Set up interval to periodically check for more content
     loadMoreCheckInterval = setInterval(() => {
@@ -193,12 +225,34 @@ const KM77PaginationManager = (function () {
           // Mark that we've scheduled an auto-load to prevent duplicates
           autoLoadScheduled = true;
 
-          // Use timeout for better performance and to avoid race conditions
-          setTimeout(() => {
-            triggerLoadMore();
-            consecutiveLoadCount++;
-            autoLoadScheduled = false;
-          }, 500);
+          // First auto-load needs special handling to prevent page freeze
+          if (isFirstAutoLoad) {
+            console.log(
+              "KM77 Customizer: This is the first auto-load, using stricter limits"
+            );
+
+            // Show a message to indicate loading is starting
+            if (KM77.statusDiv) {
+              KM77.statusDiv.innerHTML =
+                "Iniciando carga automática limitada...";
+              KM77.statusDiv.style.display = "block";
+            }
+
+            // Add a longer delay before the first load to give the browser time to render UI
+            setTimeout(() => {
+              triggerLoadMore();
+              isFirstAutoLoad = false;
+              consecutiveLoadCount++;
+              autoLoadScheduled = false;
+            }, 1000);
+          } else {
+            // Normal auto-load with standard delay
+            setTimeout(() => {
+              triggerLoadMore();
+              consecutiveLoadCount++;
+              autoLoadScheduled = false;
+            }, 500);
+          }
 
           lastAttemptTime = now;
         }
@@ -206,13 +260,35 @@ const KM77PaginationManager = (function () {
         // Reset consecutive count when we have visible rows
         consecutiveLoadCount = 0;
       }
-    }, 2000); // Check every 2 seconds
 
-    console.log("KM77 Customizer: Auto load checker interval set up");
+      // Check if content size hasn't changed after multiple loads
+      const currentSize = getTotalRowCount();
+      if (previousContentSize === currentSize && previousContentSize > 0) {
+        sameContentSizeCount++;
+
+        if (sameContentSizeCount >= MAX_SAME_CONTENT_SIZE) {
+          console.log(
+            `KM77 Customizer: Content size (${currentSize}) unchanged after ${MAX_SAME_CONTENT_SIZE} checks, likely at end of content`
+          );
+          setEndOfContentReached("No hay más resultados nuevos");
+          return;
+        }
+      } else {
+        sameContentSizeCount = 0;
+        previousContentSize = currentSize;
+      }
+    }, intervalPeriod); // Use variable interval period
+
+    console.log(
+      `KM77 Customizer: Auto load checker interval set up (${intervalPeriod}ms)`
+    );
   }
 
   // Function to trigger loading more content using multiple strategies
   function triggerLoadMore() {
+    // Start measuring load performance
+    loadStartTime = performance.now();
+
     // Final check to make sure we can still load more
     if (!shouldAllowMoreLoading()) {
       return;
@@ -282,17 +358,37 @@ const KM77PaginationManager = (function () {
 
     // Strategy 2: Force scroll to bottom of document
     const forceScroll = () => {
-      // Scroll to bottom
-      window.scrollTo(0, document.body.scrollHeight);
-      // And again with a slight difference to trigger events
-      setTimeout(() => window.scrollTo(0, document.body.scrollHeight - 1), 50);
-      setTimeout(() => window.scrollTo(0, document.body.scrollHeight), 100);
+      // Use requestAnimationFrame for smoother scrolling
+      requestAnimationFrame(() => {
+        window.scrollTo(0, document.body.scrollHeight);
+        requestAnimationFrame(() => {
+          window.scrollTo(0, document.body.scrollHeight - 1);
+          requestAnimationFrame(() => {
+            window.scrollTo(0, document.body.scrollHeight);
+          });
+        });
+      });
     };
 
     forceScroll();
 
-    // Strategy 3: Direct JavaScript execution via injected script
+    // Strategy 3: Direct JavaScript execution via injected script with better performance monitoring
     setTimeout(() => {
+      // Check if the load is taking too long already
+      const currentTime = performance.now();
+      if (
+        currentTime - loadStartTime > PERFORMANCE_THRESHOLD &&
+        totalLoadsThisSession > 1
+      ) {
+        console.log(
+          `KM77 Customizer: Loading is too slow (${Math.round(
+            currentTime - loadStartTime
+          )}ms), stopping further loads`
+        );
+        setEndOfContentReached("Carga demasiado lenta");
+        return;
+      }
+
       try {
         const injectScript = document.createElement("script");
         injectScript.textContent = `
@@ -301,48 +397,36 @@ const KM77PaginationManager = (function () {
             // Find the PagedContent instance if it exists
             const instances = Object.values(window).filter(
               v => v && typeof v === 'object' && v.constructor && 
-              v.constructor.name === 'PagedContent' && typeof v.disable === 'function'
+              v.constructor.name === 'PagedContent' && typeof v.loadMore === 'function'
             );
             
             if (instances.length > 0) {
-              console.log("KM77 Customizer: Found PagedContent instance, disabling it");
-              instances[0].disable();
-            }
-            
-            // As a fallback, remove scroll event listeners that might be pagination-related
-            const oldAddEventListener = window.addEventListener;
-            window.addEventListener = function(type, listener, options) {
-              if (type === 'scroll' && listener.toString().includes('paged-content')) {
-                console.log('KM77 Customizer: Blocked pagination scroll listener');
-                return;
-              }
-              return oldAddEventListener.apply(this, arguments);
-            };
-            
-            // Also try to find and disable the scroll handler directly
-            if (window.PagedContent && window.PagedContent.prototype) {
-              window.PagedContent.prototype._handleScroll = function() { 
-                console.log("KM77 Customizer: Disabled scroll handler");
-              };
+              console.log("KM77 Customizer: Found PagedContent instance, calling loadMore()");
+              requestAnimationFrame(() => {
+                instances[0].loadMore();
+              });
             }
           } catch(e) {
-            console.error("Error disabling native scroll pagination:", e);
+            console.error("Error accessing PagedContent:", e);
           }
         `;
         document.body.appendChild(injectScript);
-        setTimeout(() => {
+
+        // Remove script and check results with requestAnimationFrame for better performance
+        requestAnimationFrame(() => {
           document.body.removeChild(injectScript);
 
-          // Check if we've successfully loaded more
+          // Set a timeout to check if the load succeeded
           setTimeout(() => {
             checkIfLoadSucceeded(nextUrl);
           }, 2000);
-        }, 300);
+        });
       } catch (error) {
         console.error(
           "KM77 Customizer: Error injecting load more script:",
           error
         );
+
         // Reset loading state on error
         if (pagedContent) {
           pagedContent.setAttribute("data-paged-content-loading", "false");
@@ -360,6 +444,21 @@ const KM77PaginationManager = (function () {
     const currentNextUrl = pagedContent.getAttribute(
       "data-paged-content-next-url"
     );
+
+    // Check load performance
+    const loadDuration = performance.now() - loadStartTime;
+    console.log(`KM77 Customizer: Load took ${Math.round(loadDuration)}ms`);
+
+    // If loading is too slow, stop future loads
+    if (loadDuration > PERFORMANCE_THRESHOLD * 2) {
+      console.log(
+        `KM77 Customizer: Loading is extremely slow (${Math.round(
+          loadDuration
+        )}ms), stopping further loads`
+      );
+      setEndOfContentReached("Carga extremadamente lenta");
+      return;
+    }
 
     // If the next URL is empty, we've reached the end
     if (!currentNextUrl) {
@@ -387,8 +486,7 @@ const KM77PaginationManager = (function () {
 
       // Reset loading state
       pagedContent.setAttribute("data-paged-content-loading", "false");
-      // Attempt a direct fetch as last resort
-      fetchMoreContentDirectly(previousNextUrl);
+      batchInProgress = false;
     } else {
       console.log("KM77 Customizer: Load more succeeded, URL changed");
       // Reset empty response counter on success
@@ -399,31 +497,6 @@ const KM77PaginationManager = (function () {
       }
       batchInProgress = false;
     }
-  }
-
-  // Function to fetch more content directly from the server
-  function fetchMoreContentDirectly(url) {
-    if (!url) {
-      setEndOfContentReached("URL no válida");
-      return;
-    }
-
-    // One last check in case conditions changed during async operations
-    if (!shouldAllowMoreLoading()) {
-      return;
-    }
-
-    // Fetch with GM_xmlhttpRequest to bypass CORS
-    GM_xmlhttpRequest({
-      method: "GET",
-      url: url,
-      onload: function (response) {
-        // ...existing code...
-      },
-      onerror: function (error) {
-        // ...existing code...
-      },
-    });
   }
 
   // Flag that we've reached the end of available content
@@ -452,8 +525,17 @@ const KM77PaginationManager = (function () {
       loadMoreCheckInterval = null;
     }
 
+    // Clear safety timeout
+    if (safetyTimeout) {
+      clearTimeout(safetyTimeout);
+      safetyTimeout = null;
+    }
+
     // Update UI to show we've reached the end
     updateEndOfContentUI(true, reason);
+
+    // Disable any native infinite scrolling that might be active
+    disableNativeInfiniteScroll();
   }
 
   // Update UI to show end of content state
@@ -611,6 +693,9 @@ const KM77PaginationManager = (function () {
         }
       }, 60000); // Reset after 1 minute of inactivity
     }
+
+    // Reset first auto-load flag
+    isFirstAutoLoad = true;
 
     console.log("KM77 Customizer: Reset pagination state");
   }
