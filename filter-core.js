@@ -16,6 +16,11 @@ const KM77FilterCore = (function () {
       // Check if row should be visible based on all active filters
       let showRow = true;
 
+      // Skip filtering if we don't have a valid car ID
+      if (!carId) {
+        return;
+      }
+
       // Apply speaker filter if active
       if (!KM77.filtersDisabled && KM77.currentFilterValue > 0) {
         const speakerCount = KM77.speakerData.get(carId);
@@ -41,7 +46,7 @@ const KM77FilterCore = (function () {
       // Apply speed filter if active
       if (showRow && KM77.currentSpeedFilterValue > 0) {
         const perfData = KM77.performanceData.get(carId);
-        if (perfData && perfData.maxSpeed) {
+        if (perfData && perfData.maxSpeed && perfData.maxSpeed !== "-") {
           const speed = parseInt(perfData.maxSpeed) || 0;
           if (speed > 0 && speed < KM77.currentSpeedFilterValue) {
             showRow = false;
@@ -52,7 +57,11 @@ const KM77FilterCore = (function () {
       // Apply acceleration filter if active
       if (showRow && KM77.currentAccelFilterValue > 0) {
         const perfData = KM77.performanceData.get(carId);
-        if (perfData && perfData.acceleration) {
+        if (
+          perfData &&
+          perfData.acceleration &&
+          perfData.acceleration !== "-"
+        ) {
           // Convert acceleration to float, handling commas if needed
           const accelStr = perfData.acceleration.replace(",", ".");
           const accel = parseFloat(accelStr) || 0;
@@ -69,7 +78,7 @@ const KM77FilterCore = (function () {
         KM77.currentCylinderFilterValue > 0
       ) {
         const perfData = KM77.performanceData.get(carId);
-        if (perfData && perfData.cylinders) {
+        if (perfData && perfData.cylinders && perfData.cylinders !== "-") {
           const cylinderCount = parseInt(perfData.cylinders) || 0;
           if (
             cylinderCount > 0 &&

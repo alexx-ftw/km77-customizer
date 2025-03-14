@@ -4,6 +4,10 @@
 const KM77RowProcessor = (function () {
   "use strict";
 
+  // Track retry attempts
+  const retryAttempts = new Map();
+  const MAX_RETRIES = 2;
+
   // Process all existing car rows
   function processExistingRows() {
     if (KM77.isProcessing) return;
@@ -95,12 +99,14 @@ const KM77RowProcessor = (function () {
     // Find the car details link
     const carLink = row.querySelector("td.vehicle-name a.d-block");
     if (!carLink) {
-      speakersCell.innerHTML = "Error";
-      speedCell.innerHTML = "Error";
-      accelCell.innerHTML = "Error";
-      cylinderCell.innerHTML = "Error";
-      KM77.speakerData.set(carId, null);
-      KM77.performanceData.set(carId, null);
+      handleCarDataError(
+        carId,
+        speakersCell,
+        speedCell,
+        accelCell,
+        cylinderCell,
+        "Sin enlace"
+      );
       KM77UI.updateStatus(
         ++KM77.processedCount,
         KM77.mainTable.querySelectorAll("tbody tr.search").length
@@ -111,77 +117,144 @@ const KM77RowProcessor = (function () {
     // Get the car details URL
     let carDetailsUrl = carLink.getAttribute("href");
 
-    // Make a single request to the main car details page
+    // Make a single request to the main car details page with retry logic
+    makeCarDataRequest(
+      carId,
+      carDetailsUrl,
+      0,
+      speakersCell,
+      speedCell,
+      accelCell,
+      cylinderCell,
+      row
+    );
+  }
+
+  // Make a request to get car data with retry logic
+  function makeCarDataRequest(
+    carId,
+    carDetailsUrl,
+    retryCount,
+    speakersCell,
+    speedCell,
+    accelCell,
+    cylinderCell,
+    row
+  ) {
     GM_xmlhttpRequest({
       method: "GET",
       url: `https://www.km77.com${carDetailsUrl}`,
+      timeout: 10000, // 10 seconds timeout
       onload: function (response) {
-        const content = response.responseText;
+        // Reset retry count on success
+        retryAttempts.set(carId, 0);
 
-        // Process performance data (now includes cylinders)
-        KM77PerformanceDetector.processPerformanceData(
-          content,
-          carId,
-          speedCell,
-          accelCell
-        );
+        try {
+          const content = response.responseText;
 
-        // Update cylinder cell
-        const perfData = KM77.performanceData.get(carId);
-        if (perfData && perfData.cylinders && perfData.cylinders !== "-") {
-          cylinderCell.innerHTML = perfData.cylinders;
-          cylinderCell.style.color = "#0066cc";
-          cylinderCell.style.fontWeight = "bold";
-        } else {
-          cylinderCell.innerHTML = "-";
-        }
-
-        // Check if we need to make an additional request for equipment data
-        if (
-          content.includes("equipamiento") &&
-          !content.match(/[aA]ltavoces/i)
-        ) {
-          // If the main page doesn't contain speaker info but has a link to equipment page,
-          // make a second request just for speakers
-          const equipmentUrl = carDetailsUrl.replace(
-            "/datos",
-            "/datos/equipamiento"
+          // Process performance data (now includes cylinders)
+          KM77PerformanceDetector.processPerformanceData(
+            content,
+            carId,
+            speedCell,
+            accelCell
           );
 
-          GM_xmlhttpRequest({
-            method: "GET",
-            url: `https://www.km77.com${equipmentUrl}`,
-            onload: function (eqResponse) {
+          // Update cylinder cell
+          const perfData = KM77.performanceData.get(carId);
+          if (perfData && perfData.cylinders && perfData.cylinders !== "-") {
+            cylinderCell.innerHTML = perfData.cylinders;
+            cylinderCell.style.color = "#0066cc";
+            cylinderCell.style.fontWeight = "bold";
+          } else {
+            cylinderCell.innerHTML = "-";
+          }
+
+          // Check if we need to make an additional request for equipment data
+          if (
+            content.includes("equipamiento") &&
+            !content.match(/[aA]ltavoces/i)
+          ) {
+            // If the main page doesn't contain speaker info but has a link to equipment page,
+            // make a second request just for speakers
+            const equipmentUrl = carDetailsUrl.replace(
+              "/datos",
+              "/datos/equipamiento"
+            );
+
+            GM_xmlhttpRequest({
+              method: "GET",
+              url: `https://www.km77.com${equipmentUrl}`,
+              timeout: 10000, // 10 seconds timeout
+              onload: function (eqResponse) {
+                try {
+                  KM77SpeakerDetector.processSpeakerData(
+                    eqResponse.responseText,
+                    carId,
+                    speakersCell,
+                    row
+                  );
+                } catch (err) {
+                  console.error(
+                    `Error processing speaker data for ${carId}:`,
+                    err
+                  );
+                  speakersCell.innerHTML = "-";
+                  KM77.speakerData.set(carId, "0");
+                }
+                KM77UI.updateStatus(
+                  ++KM77.processedCount,
+                  KM77.mainTable.querySelectorAll("tbody tr.search").length
+                );
+              },
+              onerror: function (error) {
+                console.error(
+                  `Error fetching equipment data for ${carId}: ${error}`
+                );
+                speakersCell.innerHTML = "-";
+                KM77.speakerData.set(carId, "0");
+                KM77UI.updateStatus(
+                  ++KM77.processedCount,
+                  KM77.mainTable.querySelectorAll("tbody tr.search").length
+                );
+              },
+              ontimeout: function () {
+                console.warn(`Timeout fetching equipment data for ${carId}`);
+                speakersCell.innerHTML = "-";
+                KM77.speakerData.set(carId, "0");
+                KM77UI.updateStatus(
+                  ++KM77.processedCount,
+                  KM77.mainTable.querySelectorAll("tbody tr.search").length
+                );
+              },
+            });
+          } else {
+            // Try to extract speaker data from the main page
+            try {
               KM77SpeakerDetector.processSpeakerData(
-                eqResponse.responseText,
+                content,
                 carId,
                 speakersCell,
                 row
               );
-              KM77UI.updateStatus(
-                ++KM77.processedCount,
-                KM77.mainTable.querySelectorAll("tbody tr.search").length
-              );
-            },
-            onerror: function (error) {
-              console.error(
-                `Error fetching equipment data for ${carId}: ${error}`
-              );
-              speakersCell.innerHTML = "Error";
-              KM77.speakerData.set(carId, null);
-              KM77UI.updateStatus(
-                ++KM77.processedCount,
-                KM77.mainTable.querySelectorAll("tbody tr.search").length
-              );
-            },
-          });
-        } else {
-          // Try to extract speaker data from the main page
-          KM77SpeakerDetector.processSpeakerData(
-            content,
+            } catch (err) {
+              console.error(`Error processing speaker data for ${carId}:`, err);
+              speakersCell.innerHTML = "-";
+              KM77.speakerData.set(carId, "0");
+            }
+            KM77UI.updateStatus(
+              ++KM77.processedCount,
+              KM77.mainTable.querySelectorAll("tbody tr.search").length
+            );
+          }
+        } catch (err) {
+          console.error(`Error processing data for ${carId}:`, err);
+          handleCarDataError(
             carId,
             speakersCell,
-            row
+            speedCell,
+            accelCell,
+            cylinderCell
           );
           KM77UI.updateStatus(
             ++KM77.processedCount,
@@ -190,32 +263,125 @@ const KM77RowProcessor = (function () {
         }
       },
       onerror: function (error) {
-        console.error(`Error fetching data for ${carId}: ${error}`);
-        speakersCell.innerHTML = "Error";
-        speedCell.innerHTML = "Error";
-        accelCell.innerHTML = "Error";
-        cylinderCell.innerHTML = "Error";
-        KM77.speakerData.set(carId, null);
-        KM77.performanceData.set(carId, null);
-        KM77UI.updateStatus(
-          ++KM77.processedCount,
-          KM77.mainTable.querySelectorAll("tbody tr.search").length
+        handleRequestError(
+          carId,
+          carDetailsUrl,
+          retryCount,
+          speakersCell,
+          speedCell,
+          accelCell,
+          cylinderCell,
+          row,
+          error
         );
       },
       ontimeout: function () {
-        console.warn(`Timeout fetching data for ${carId}`);
-        speakersCell.innerHTML = "Timeout";
-        speedCell.innerHTML = "Timeout";
-        accelCell.innerHTML = "Timeout";
-        cylinderCell.innerHTML = "Timeout";
-        KM77.speakerData.set(carId, null);
-        KM77.performanceData.set(carId, null);
-        KM77UI.updateStatus(
-          ++KM77.processedCount,
-          KM77.mainTable.querySelectorAll("tbody tr.search").length
+        handleRequestError(
+          carId,
+          carDetailsUrl,
+          retryCount,
+          speakersCell,
+          speedCell,
+          accelCell,
+          cylinderCell,
+          row,
+          "timeout"
         );
       },
     });
+  }
+
+  // Handle request errors with retry logic
+  function handleRequestError(
+    carId,
+    carDetailsUrl,
+    retryCount,
+    speakersCell,
+    speedCell,
+    accelCell,
+    cylinderCell,
+    row,
+    error
+  ) {
+    console.warn(
+      `Error fetching data for ${carId} (attempt ${retryCount + 1}): ${error}`
+    );
+
+    // Try up to MAX_RETRIES times with increasing delay
+    if (retryCount < MAX_RETRIES) {
+      const nextRetry = retryCount + 1;
+      const delay = nextRetry * 2000; // Progressive backoff: 2s, 4s
+
+      console.log(`Retrying ${carId} in ${delay}ms (attempt ${nextRetry + 1})`);
+
+      // Update cells to show retrying status
+      speakersCell.innerHTML = `<span class="loading">Reintentando (${nextRetry})...</span>`;
+      speedCell.innerHTML = `<span class="loading">Reintentando (${nextRetry})...</span>`;
+      accelCell.innerHTML = `<span class="loading">Reintentando (${nextRetry})...</span>`;
+      cylinderCell.innerHTML = `<span class="loading">Reintentando (${nextRetry})...</span>`;
+
+      // Retry after delay
+      setTimeout(() => {
+        makeCarDataRequest(
+          carId,
+          carDetailsUrl,
+          nextRetry,
+          speakersCell,
+          speedCell,
+          accelCell,
+          cylinderCell,
+          row
+        );
+      }, delay);
+    } else {
+      // Max retries reached, display fallback values
+      handleCarDataError(
+        carId,
+        speakersCell,
+        speedCell,
+        accelCell,
+        cylinderCell
+      );
+      KM77UI.updateStatus(
+        ++KM77.processedCount,
+        KM77.mainTable.querySelectorAll("tbody tr.search").length
+      );
+    }
+  }
+
+  // Handle car data errors by displaying appropriate fallback values
+  function handleCarDataError(
+    carId,
+    speakersCell,
+    speedCell,
+    accelCell,
+    cylinderCell,
+    reason = "Error"
+  ) {
+    // Use "-" instead of "Error" for a cleaner UI
+    speakersCell.innerHTML = "-";
+    speedCell.innerHTML = "-";
+    accelCell.innerHTML = "-";
+    cylinderCell.innerHTML = "-";
+
+    // Add tooltip with error details
+    [speakersCell, speedCell, accelCell, cylinderCell].forEach((cell) => {
+      cell.title = `No se pudieron cargar datos: ${reason}`;
+      cell.style.color = "#999"; // Light gray to indicate no data
+    });
+
+    // Store empty values in data maps
+    KM77.speakerData.set(carId, "0");
+    KM77.performanceData.set(carId, {
+      maxSpeed: "-",
+      acceleration: "-",
+      cylinders: "-",
+    });
+
+    // Log the error for debugging
+    console.warn(
+      `Failed to load data for car ${carId} after all attempts: ${reason}`
+    );
   }
 
   // Public API
