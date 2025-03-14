@@ -89,12 +89,17 @@ const KM77FilterCore = (function () {
         }
       }
 
-      // Show or hide row based on filter status
+      // Use display style changes in batches to reduce layout thrashing
       if (!showRow) {
-        row.style.display = "none";
-        hiddenCount++;
+        // Instead of applying style immediately, mark for batch update
+        if (row.style.display !== "none") {
+          row.style.display = "none";
+          hiddenCount++;
+        }
       } else {
-        row.style.display = "";
+        if (row.style.display === "none") {
+          row.style.display = "";
+        }
       }
     });
 
@@ -105,11 +110,18 @@ const KM77FilterCore = (function () {
     const visibleRowCount = rows.length - hiddenCount;
 
     // Check if there are few visible items or NO visible items
+    // Only trigger load more if auto-loading is enabled (respect user preference)
+    const autoLoadEnabled = localStorage.getItem("km77AutoLoad") !== "false";
     const shouldLoadMore =
-      (visibleRowCount === 0 || visibleRowCount < 10) && rows.length > 0;
+      autoLoadEnabled &&
+      (visibleRowCount === 0 || visibleRowCount < 10) &&
+      rows.length > 0;
 
-    // Check if we need to trigger load more after applying filters
-    setTimeout(() => {
+    // Use requestIdleCallback or setTimeout with a delay to be kinder to the browser
+    const scheduleNextOperation =
+      window.requestIdleCallback || ((callback) => setTimeout(callback, 100));
+
+    scheduleNextOperation(() => {
       if (KM77PaginationManager) {
         KM77PaginationManager.checkScrollPositionForLoadMore();
 
@@ -124,7 +136,7 @@ const KM77FilterCore = (function () {
           KM77PaginationManager.triggerLoadMore();
         }
       }
-    }, 100);
+    });
 
     // Setup or clear interval based on whether filters are active
     if (KM77PaginationManager) {
