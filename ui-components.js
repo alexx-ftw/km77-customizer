@@ -1,4 +1,4 @@
-// KM77 Customizer - UI Components Module - Version 14
+// KM77 Customizer - UI Components Module - Version 15
 // Handles status indicators and other UI elements
 
 const KM77UI = (function () {
@@ -672,43 +672,6 @@ const KM77UI = (function () {
         });
 
         KM77.filterStatusDiv.appendChild(loadMoreLink);
-      }
-
-      // Add an auto-load toggle
-      if (!KM77.filterStatusDiv.querySelector(".auto-load-toggle")) {
-        const toggleContainer = document.createElement("div");
-        toggleContainer.style.marginTop = "5px";
-
-        const autoLoadCheckbox = document.createElement("input");
-        autoLoadCheckbox.type = "checkbox";
-        autoLoadCheckbox.id = "km77-auto-load";
-        autoLoadCheckbox.checked =
-          localStorage.getItem("km77AutoLoad") !== "false";
-
-        const autoLoadLabel = document.createElement("label");
-        autoLoadLabel.htmlFor = "km77-auto-load";
-        autoLoadLabel.textContent = " Auto-cargar más resultados";
-        autoLoadLabel.style.marginLeft = "5px";
-        autoLoadLabel.style.cursor = "pointer";
-        autoLoadLabel.style.fontWeight = "normal";
-
-        toggleContainer.appendChild(autoLoadCheckbox);
-        toggleContainer.appendChild(autoLoadLabel);
-
-        // When toggled, save preference
-        autoLoadCheckbox.addEventListener("change", function () {
-          localStorage.setItem("km77AutoLoad", this.checked);
-
-          // Immediately check if we need to load more
-          if (this.checked) {
-            setTimeout(() => {
-              KM77FilterManager.checkScrollPositionForLoadMore();
-            }, 500);
-          }
-        });
-
-        KM77.filterStatusDiv.appendChild(toggleContainer);
-        KM77.filterStatusDiv.classList.add("with-auto-load");
       }
     } else {
       KM77.filterStatusDiv.style.display = "none";
