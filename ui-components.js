@@ -719,7 +719,12 @@ const KM77UI = (function () {
   function updateStatus(processed, total) {
     if (!KM77.statusDiv) return;
 
-    const percent = Math.round((processed / total) * 100);
+    // Ensure the processed count doesn't exceed the total
+    if (processed > total) {
+      processed = total;
+    }
+
+    const percent = Math.min(Math.round((processed / total) * 100), 100);
     KM77.statusDiv.innerHTML = `Procesando: ${processed}/${total} (${percent}%)`;
     KM77.statusDiv.style.display = "block";
 

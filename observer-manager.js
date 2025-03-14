@@ -44,6 +44,8 @@ const KM77ObserverManager = (function () {
         if (pageChanging) {
           // Clear processed rows tracking when pagination changes
           KM77.processedRows.clear();
+          // Reset processed count
+          KM77.processedCount = 0;
 
           // Wait for the new page to be fully rendered
           setTimeout(() => {
@@ -100,6 +102,8 @@ const KM77ObserverManager = (function () {
       if (newTableFound) {
         // Reset processed rows tracking when new tables are found
         KM77.processedRows.clear();
+        // Reset processed count
+        KM77.processedCount = 0;
         setTimeout(KM77TableMerger.mergeTables, 500);
       }
     });

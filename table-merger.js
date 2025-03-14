@@ -25,6 +25,9 @@ const KM77TableMerger = (function () {
 
     if (tables.length <= 1) return; // No additional tables to merge
 
+    // Reset processed count to avoid inflated numbers
+    KM77.processedCount = 0;
+
     // Capture current sort state before merging
     const currentSortColumn = KM77.mainTable.querySelector(
       ".js-sortable i.fa-sort-amount-asc:not(.d-none), .js-sortable i.fa-sort-amount-desc:not(.d-none)"

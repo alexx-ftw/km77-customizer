@@ -9,6 +9,7 @@ When making code changes, make sure no functionality is lost, unless its intende
 Make sure file name extensions are not duplicated by mistake.
 Make sure _not_ to add code block markers at the end of files, unless really intended.
 Do not create any new files without explcitly asking the user for permission.
+Try to keep files below 500 lines when possible.
 
 Extremely important: When editing a module file, modify its version in the Core file by adding one to the already present version number, or add if missing:
 "[...].js?v=1" -> "[...].js?v=2"

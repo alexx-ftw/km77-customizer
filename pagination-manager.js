@@ -8,6 +8,11 @@ const KM77PaginationManager = (function () {
   let loadMoreCheckInterval = null;
   let lastAttemptTime = 0;
 
+  // Batch loading configuration
+  const BATCH_SIZE = 100; // Maximum cars per batch
+  let currentBatchCount = 0;
+  let batchInProgress = false;
+
   // Function to check scroll position and trigger "load more" if needed
   function checkScrollPositionForLoadMore() {
     // Only check if filters are active (some content is hidden)
@@ -31,11 +36,14 @@ const KM77PaginationManager = (function () {
         lastRowPosition = window.scrollY + rect.bottom;
       }
 
-      // If we're within 800px of the bottom or last visible row, try to trigger load more
+      // Only trigger load more when:
+      // 1. We're very close to the bottom of the page (scrolling down)
+      // 2. We haven't already loaded BATCH_SIZE cars in this batch
       if (
-        documentHeight - scrollPosition < 800 ||
-        scrollPosition + window.innerHeight >= lastRowPosition - 200 ||
-        scrollPosition + 5 >= documentHeight
+        !batchInProgress &&
+        currentBatchCount < BATCH_SIZE &&
+        (scrollPosition + 100 >= documentHeight || // Very close to bottom
+          scrollPosition + window.innerHeight >= lastRowPosition - 100) // Close to last visible row
       ) {
         triggerLoadMore();
       }
@@ -58,24 +66,22 @@ const KM77PaginationManager = (function () {
           KM77.mainTable.querySelectorAll("tbody tr.search")
         ).filter((row) => row.style.display !== "none");
 
-        if (visibleRows.length > 0) {
-          const lastVisibleRow = visibleRows[visibleRows.length - 1];
-          const rect = lastVisibleRow.getBoundingClientRect();
-
-          // If the last visible row is within viewport or we have few visible rows, try to load more
-          if (
-            rect.bottom <= window.innerHeight + 500 ||
-            visibleRows.length < 12
-          ) {
-            // Don't trigger too frequently - limit to once every 3 seconds
-            const now = Date.now();
-            if (now - lastAttemptTime > 3000) {
-              lastAttemptTime = now;
-              console.log(
-                "KM77 Customizer: Auto-triggering load more from interval checker"
-              );
-              triggerLoadMore();
-            }
+        // Only auto-load more if:
+        // 1. There are NO visible rows (nothing to show with current filters)
+        // 2. We haven't already loaded BATCH_SIZE cars in this batch
+        if (
+          visibleRows.length === 0 &&
+          !batchInProgress &&
+          currentBatchCount < BATCH_SIZE
+        ) {
+          // Don't trigger too frequently - limit to once every 3 seconds
+          const now = Date.now();
+          if (now - lastAttemptTime > 3000) {
+            lastAttemptTime = now;
+            console.log(
+              "KM77 Customizer: Auto-triggering load more as no visible rows with current filters"
+            );
+            triggerLoadMore();
           }
         }
       }, 1500); // Check every 1.5 seconds
@@ -96,6 +102,7 @@ const KM77PaginationManager = (function () {
     if (nextUrl && !isLoading) {
       console.log("KM77 Customizer: Attempting to trigger load more...");
       lastAttemptTime = Date.now();
+      batchInProgress = true;
 
       // Update the status to show we're trying to load more
       if (KM77.statusDiv) {
@@ -265,6 +272,7 @@ const KM77PaginationManager = (function () {
           if (pagedContent) {
             pagedContent.setAttribute("data-paged-content-loading", "false");
           }
+          batchInProgress = false;
         }
       }, 300);
     }
@@ -291,6 +299,7 @@ const KM77PaginationManager = (function () {
       if (KM77.statusDiv) {
         KM77.statusDiv.style.display = "none";
       }
+      batchInProgress = false;
     }
   }
 
@@ -365,7 +374,13 @@ const KM77PaginationManager = (function () {
               if (KM77.statusDiv) {
                 KM77.statusDiv.style.display = "none";
               }
+
+              // Update batch count and reset batch status
+              currentBatchCount += newRows.length;
+              batchInProgress = false;
             }
+          } else {
+            batchInProgress = false;
           }
         } else {
           console.error(
@@ -377,6 +392,7 @@ const KM77PaginationManager = (function () {
               KM77.statusDiv.style.display = "none";
             }, 3000);
           }
+          batchInProgress = false;
         }
       },
       onerror: function (error) {
@@ -387,6 +403,7 @@ const KM77PaginationManager = (function () {
             KM77.statusDiv.style.display = "none";
           }, 3000);
         }
+        batchInProgress = false;
       },
     });
   }
@@ -428,6 +445,14 @@ const KM77PaginationManager = (function () {
         event.detail ? `(${event.detail.count} rows)` : ""
       );
 
+      if (event.detail && event.detail.count) {
+        // Update batch counter with newly added rows
+        currentBatchCount += event.detail.count;
+        console.log(
+          `KM77 Customizer: Current batch count: ${currentBatchCount}/${BATCH_SIZE}`
+        );
+      }
+
       setTimeout(() => {
         // Try to process the new rows
         if (
@@ -438,12 +463,26 @@ const KM77PaginationManager = (function () {
         }
         // Reapply filters
         KM77FilterCore.applyFilters();
+
+        // Batch is no longer in progress
+        batchInProgress = false;
       }, 100);
     });
+
+    // Reset batch count when a new page or search is started
+    window.addEventListener("popstate", resetBatchCount);
+    document.addEventListener("km77ResetSearch", resetBatchCount);
 
     console.log(
       "KM77 Customizer: Enhanced scroll monitoring for load more initialized"
     );
+  }
+
+  // Reset batch counter when starting a new search or page
+  function resetBatchCount() {
+    currentBatchCount = 0;
+    batchInProgress = false;
+    console.log("KM77 Customizer: Batch counter reset");
   }
 
   // Public API
@@ -452,5 +491,6 @@ const KM77PaginationManager = (function () {
     setupAutoLoadMoreChecker: setupAutoLoadMoreChecker,
     triggerLoadMore: triggerLoadMore,
     setupScrollMonitoring: setupScrollMonitoring,
+    resetBatchCount: resetBatchCount,
   };
 })();

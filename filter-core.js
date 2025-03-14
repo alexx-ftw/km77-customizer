@@ -109,13 +109,10 @@ const KM77FilterCore = (function () {
     // Calculate visible row count
     const visibleRowCount = rows.length - hiddenCount;
 
-    // Check if there are few visible items or NO visible items
-    // Only trigger load more if auto-loading is enabled (respect user preference)
+    // Check if there are NO visible items and auto-load is enabled
     const autoLoadEnabled = localStorage.getItem("km77AutoLoad") !== "false";
     const shouldLoadMore =
-      autoLoadEnabled &&
-      (visibleRowCount === 0 || visibleRowCount < 10) &&
-      rows.length > 0;
+      autoLoadEnabled && visibleRowCount === 0 && rows.length > 0;
 
     // Use requestIdleCallback or setTimeout with a delay to be kinder to the browser
     const scheduleNextOperation =
@@ -123,15 +120,10 @@ const KM77FilterCore = (function () {
 
     scheduleNextOperation(() => {
       if (KM77PaginationManager) {
-        KM77PaginationManager.checkScrollPositionForLoadMore();
-
-        // Auto-load more content if too few visible items or all are filtered
+        // Auto-load more content only if there are no visible items
         if (shouldLoadMore) {
           console.log(
-            "KM77 Customizer: Auto-loading more due to " +
-              (visibleRowCount === 0
-                ? "all rows filtered"
-                : "few visible items")
+            "KM77 Customizer: Auto-loading more due to no visible items with current filters"
           );
           KM77PaginationManager.triggerLoadMore();
         }

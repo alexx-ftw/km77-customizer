@@ -20,6 +20,9 @@ const KM77RowProcessor = (function () {
       `KM77 Customizer: Found ${carRows.length} car listings in main table.`
     );
 
+    // Reset processed count to ensure accurate tracking
+    KM77.processedCount = 0;
+
     // Process each row with its index to ensure unique identification
     carRows.forEach((row, index) => processCarRow(row, index));
 
