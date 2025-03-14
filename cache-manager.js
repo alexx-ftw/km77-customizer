@@ -1,4 +1,4 @@
-// KM77 Customizer - Cache Manager Module - Version 3
+// KM77 Customizer - Cache Manager Module - Version 4
 // Handles caching car data to reduce server load and improve filtering performance
 
 const KM77CacheManager = (function () {
@@ -6,7 +6,7 @@ const KM77CacheManager = (function () {
 
   // Cache constants
   const CACHE_KEY_PREFIX = "km77cache_";
-  const CACHE_VERSION = 2; // Increment when changing data structure
+  const CACHE_VERSION = 3; // Increment when changing data structure
   const CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
 
   // Initialize cache and clean up expired items
