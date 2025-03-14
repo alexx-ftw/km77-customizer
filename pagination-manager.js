@@ -13,6 +13,14 @@ const KM77PaginationManager = (function () {
   let currentBatchCount = 0;
   let batchInProgress = false;
 
+  // Add loading control parameters
+  const COOLDOWN_PERIOD = 5000; // 5 seconds between auto-load attempts
+  const MAX_CONSECUTIVE_LOADS = 3; // Maximum consecutive auto-loads
+  const MAX_TOTAL_LOADS_PER_SESSION = 10; // Maximum loads per session
+  let consecutiveLoadCount = 0;
+  let totalLoadsThisSession = 0;
+  let lastLoadTime = 0;
+
   // Function to check scroll position and trigger "load more" if needed
   function checkScrollPositionForLoadMore() {
     // Only check if filters are active (some content is hidden)
@@ -39,9 +47,16 @@ const KM77PaginationManager = (function () {
       // Only trigger load more when:
       // 1. We're very close to the bottom of the page (scrolling down)
       // 2. We haven't already loaded BATCH_SIZE cars in this batch
+      // 3. We haven't exceeded our loading limits
+      const now = Date.now();
+      const cooledDown = now - lastLoadTime > COOLDOWN_PERIOD;
+      const withinLimits = totalLoadsThisSession < MAX_TOTAL_LOADS_PER_SESSION;
+
       if (
         !batchInProgress &&
         currentBatchCount < BATCH_SIZE &&
+        cooledDown &&
+        withinLimits &&
         (scrollPosition + 100 >= documentHeight || // Very close to bottom
           scrollPosition + window.innerHeight >= lastRowPosition - 100) // Close to last visible row
       ) {
@@ -66,15 +81,27 @@ const KM77PaginationManager = (function () {
           KM77.mainTable.querySelectorAll("tbody tr.search")
         ).filter((row) => row.style.display !== "none");
 
+        // Check if we're within our loading limits
+        const now = Date.now();
+        const cooledDown = now - lastLoadTime > COOLDOWN_PERIOD;
+        const withinConsecutiveLimit =
+          consecutiveLoadCount < MAX_CONSECUTIVE_LOADS;
+        const withinTotalLimit =
+          totalLoadsThisSession < MAX_TOTAL_LOADS_PER_SESSION;
+
         // Only auto-load more if:
         // 1. There are NO visible rows (nothing to show with current filters)
         // 2. We haven't already loaded BATCH_SIZE cars in this batch
+        // 3. We're within our loading limits
         if (
           visibleRows.length === 0 &&
           !batchInProgress &&
-          currentBatchCount < BATCH_SIZE
+          currentBatchCount < BATCH_SIZE &&
+          cooledDown &&
+          withinConsecutiveLimit &&
+          withinTotalLimit
         ) {
-          // Don't trigger too frequently - limit to once every 3 seconds
+          // Don't trigger too frequently
           const now = Date.now();
           if (now - lastAttemptTime > 3000) {
             lastAttemptTime = now;
@@ -82,9 +109,13 @@ const KM77PaginationManager = (function () {
               "KM77 Customizer: Auto-triggering load more as no visible rows with current filters"
             );
             triggerLoadMore();
+            consecutiveLoadCount++;
           }
+        } else if (visibleRows.length > 0) {
+          // Reset consecutive count when we have visible rows
+          consecutiveLoadCount = 0;
         }
-      }, 1500); // Check every 1.5 seconds
+      }, 2000); // Check every 2 seconds (increased from 1.5s)
     }
   }
 
@@ -102,11 +133,13 @@ const KM77PaginationManager = (function () {
     if (nextUrl && !isLoading) {
       console.log("KM77 Customizer: Attempting to trigger load more...");
       lastAttemptTime = Date.now();
+      lastLoadTime = Date.now();
       batchInProgress = true;
+      totalLoadsThisSession++;
 
       // Update the status to show we're trying to load more
       if (KM77.statusDiv) {
-        KM77.statusDiv.innerHTML = "Cargando más resultados...";
+        KM77.statusDiv.innerHTML = `Cargando más resultados... (${totalLoadsThisSession}/${MAX_TOTAL_LOADS_PER_SESSION})`;
         KM77.statusDiv.style.display = "block";
         KM77.statusDiv.removeAttribute("data-completed");
       }
@@ -275,6 +308,15 @@ const KM77PaginationManager = (function () {
           batchInProgress = false;
         }
       }, 300);
+    } else if (totalLoadsThisSession >= MAX_TOTAL_LOADS_PER_SESSION) {
+      // Show a message if we've reached the load limit
+      if (KM77.statusDiv) {
+        KM77.statusDiv.innerHTML = `Límite de carga alcanzado (${MAX_TOTAL_LOADS_PER_SESSION}). Recarga la página para más.`;
+        KM77.statusDiv.style.display = "block";
+        setTimeout(() => {
+          KM77.statusDiv.style.display = "none";
+        }, 5000);
+      }
     }
   }
 
@@ -413,7 +455,7 @@ const KM77PaginationManager = (function () {
     // More responsive scroll handler with improved throttling
     let scrollTimeout;
     let lastScrollTime = 0;
-    const throttleDelay = 100; // ms
+    const throttleDelay = 250; // Increased from 100ms to 250ms for less frequent checks
 
     window.addEventListener("scroll", function () {
       const now = Date.now();
@@ -435,7 +477,7 @@ const KM77PaginationManager = (function () {
     // Also check when window is resized
     window.addEventListener("resize", function () {
       if (scrollTimeout) clearTimeout(scrollTimeout);
-      scrollTimeout = setTimeout(checkScrollPositionForLoadMore, 200);
+      scrollTimeout = setTimeout(checkScrollPositionForLoadMore, 300);
     });
 
     // Listen for custom event when new rows are manually added
@@ -482,6 +524,8 @@ const KM77PaginationManager = (function () {
   function resetBatchCount() {
     currentBatchCount = 0;
     batchInProgress = false;
+    consecutiveLoadCount = 0; // Reset consecutive loads counter
+    // Don't reset totalLoadsThisSession to maintain the session limit
     console.log("KM77 Customizer: Batch counter reset");
   }
 

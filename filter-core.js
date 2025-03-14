@@ -4,6 +4,10 @@
 const KM77FilterCore = (function () {
   "use strict";
 
+  // Track auto-load trigger count to prevent excessive loading
+  let autoLoadTriggerCount = 0;
+  const MAX_AUTO_LOAD_TRIGGERS = 3;
+
   // Function to apply all filters together
   function applyFilters() {
     // Get all rows from the main table
@@ -112,20 +116,39 @@ const KM77FilterCore = (function () {
     // Check if there are NO visible items and auto-load is enabled
     const autoLoadEnabled = localStorage.getItem("km77AutoLoad") !== "false";
     const shouldLoadMore =
-      autoLoadEnabled && visibleRowCount === 0 && rows.length > 0;
+      autoLoadEnabled &&
+      visibleRowCount === 0 &&
+      rows.length > 0 &&
+      autoLoadTriggerCount < MAX_AUTO_LOAD_TRIGGERS;
 
     // Use requestIdleCallback or setTimeout with a delay to be kinder to the browser
     const scheduleNextOperation =
-      window.requestIdleCallback || ((callback) => setTimeout(callback, 100));
+      window.requestIdleCallback || ((callback) => setTimeout(callback, 300));
 
     scheduleNextOperation(() => {
-      if (KM77PaginationManager) {
-        // Auto-load more content only if there are no visible items
-        if (shouldLoadMore) {
+      if (KM77PaginationManager && shouldLoadMore) {
+        // Auto-load more content only if there are no visible items and we haven't exceeded our trigger limit
+        console.log(
+          `KM77 Customizer: Auto-loading more due to no visible items. Trigger count: ${
+            autoLoadTriggerCount + 1
+          }/${MAX_AUTO_LOAD_TRIGGERS}`
+        );
+        autoLoadTriggerCount++;
+        KM77PaginationManager.triggerLoadMore();
+
+        // If we've reached our trigger limit, notify the user
+        if (autoLoadTriggerCount >= MAX_AUTO_LOAD_TRIGGERS) {
           console.log(
-            "KM77 Customizer: Auto-loading more due to no visible items with current filters"
+            "KM77 Customizer: Auto-load trigger limit reached. Stopping automatic loading."
           );
-          KM77PaginationManager.triggerLoadMore();
+          if (KM77.filterStatusDiv) {
+            const loadMoreLink =
+              KM77.filterStatusDiv.querySelector(".load-more-link");
+            if (loadMoreLink) {
+              loadMoreLink.textContent = " [Cargar más manualmente]";
+              loadMoreLink.style.color = "#ffcc00";
+            }
+          }
         }
       }
     });
@@ -214,6 +237,9 @@ const KM77FilterCore = (function () {
 
   // Apply filters when initializing, based on saved states
   function initializeFilters() {
+    // Reset auto-load counter when initializing filters
+    autoLoadTriggerCount = 0;
+
     // If we have saved filters that are active, apply them immediately
     if (
       (!KM77.filtersDisabled && KM77.currentFilterValue > 0) ||
