@@ -1,4 +1,4 @@
-// KM77 Customizer - Pagination Manager Module - Version 7
+// KM77 Customizer - Pagination Manager Module - Version 8
 // Handles automatic loading of more content when filtering is active
 
 const KM77PaginationManager = (function () {
@@ -16,9 +16,9 @@ const KM77PaginationManager = (function () {
   // Flag to track when we've reached the end of content
   let reachedEndOfContent = false;
 
-  // Hard limit to prevent runaway loading
-  const ABSOLUTE_ROW_LIMIT = 500; // Stop loading after this many total rows
-  const ABSOLUTE_LOAD_LIMIT = 15; // Maximum number of loads regardless of session settings
+  // Hard limits to prevent runaway loading
+  const ABSOLUTE_ROW_LIMIT = 300; // Stop loading after this many total rows
+  const ABSOLUTE_LOAD_LIMIT = 12; // Maximum number of loads regardless of session settings
 
   // Add loading control parameters
   const COOLDOWN_PERIOD = 5000; // 5 seconds between auto-load attempts
@@ -34,6 +34,18 @@ const KM77PaginationManager = (function () {
 
   // Add a flag to track if an auto-load is already scheduled to prevent multiple loads
   let autoLoadScheduled = false;
+
+  // Safety timeout to force end after a certain period
+  let safetyTimeout = null;
+  const SAFETY_TIMEOUT_DURATION = 45000; // 45 seconds max for a loading session
+
+  // Track the previous content size to detect if we're actually getting new content
+  let previousContentSize = 0;
+  let sameContentSizeCount = 0;
+  const MAX_SAME_CONTENT_SIZE = 2;
+
+  // Counter for the number of rows before any loading
+  let initialRowCount = 0;
 
   // Helper to get all currently visible rows
   function getVisibleRows() {
@@ -284,7 +296,38 @@ const KM77PaginationManager = (function () {
       try {
         const injectScript = document.createElement("script");
         injectScript.textContent = `
-          // ...existing code...
+          // Try to disable native infinite scroll
+          try {
+            // Find the PagedContent instance if it exists
+            const instances = Object.values(window).filter(
+              v => v && typeof v === 'object' && v.constructor && 
+              v.constructor.name === 'PagedContent' && typeof v.disable === 'function'
+            );
+            
+            if (instances.length > 0) {
+              console.log("KM77 Customizer: Found PagedContent instance, disabling it");
+              instances[0].disable();
+            }
+            
+            // As a fallback, remove scroll event listeners that might be pagination-related
+            const oldAddEventListener = window.addEventListener;
+            window.addEventListener = function(type, listener, options) {
+              if (type === 'scroll' && listener.toString().includes('paged-content')) {
+                console.log('KM77 Customizer: Blocked pagination scroll listener');
+                return;
+              }
+              return oldAddEventListener.apply(this, arguments);
+            };
+            
+            // Also try to find and disable the scroll handler directly
+            if (window.PagedContent && window.PagedContent.prototype) {
+              window.PagedContent.prototype._handleScroll = function() { 
+                console.log("KM77 Customizer: Disabled scroll handler");
+              };
+            }
+          } catch(e) {
+            console.error("Error disabling native scroll pagination:", e);
+          }
         `;
         document.body.appendChild(injectScript);
         setTimeout(() => {
@@ -462,6 +505,67 @@ const KM77PaginationManager = (function () {
         KM77.statusDiv.style.display = "none";
       }, 5000);
     }
+
+    // Disable any native infinite scrolling that might be active
+    disableNativeInfiniteScroll();
+  }
+
+  // Helper to disable the site's native infinite scroll mechanisms
+  function disableNativeInfiniteScroll() {
+    try {
+      // Attempt to disable site's own pagination triggers
+      const pagedContent = document.querySelector(".js-paged-content");
+      if (pagedContent) {
+        // Set next URL to empty to prevent any more loading
+        pagedContent.setAttribute("data-paged-content-next-url", "");
+        // Remove any loading state
+        pagedContent.setAttribute("data-paged-content-loading", "false");
+
+        // Inject a script to disable scroll handlers
+        const script = document.createElement("script");
+        script.textContent = `
+          // Try to disable native infinite scroll
+          try {
+            // Find the PagedContent instance if it exists
+            const instances = Object.values(window).filter(
+              v => v && typeof v === 'object' && v.constructor && 
+              v.constructor.name === 'PagedContent' && typeof v.disable === 'function'
+            );
+            
+            if (instances.length > 0) {
+              console.log("KM77 Customizer: Found PagedContent instance, disabling it");
+              instances[0].disable();
+            }
+            
+            // As a fallback, remove scroll event listeners that might be pagination-related
+            const oldAddEventListener = window.addEventListener;
+            window.addEventListener = function(type, listener, options) {
+              if (type === 'scroll' && listener.toString().includes('paged-content')) {
+                console.log('KM77 Customizer: Blocked pagination scroll listener');
+                return;
+              }
+              return oldAddEventListener.apply(this, arguments);
+            };
+            
+            // Also try to find and disable the scroll handler directly
+            if (window.PagedContent && window.PagedContent.prototype) {
+              window.PagedContent.prototype._handleScroll = function() { 
+                console.log("KM77 Customizer: Disabled scroll handler");
+              };
+            }
+          } catch(e) {
+            console.error("Error disabling native scroll pagination:", e);
+          }
+        `;
+        document.body.appendChild(script);
+        setTimeout(() => document.body.removeChild(script), 100);
+      }
+    } catch (e) {
+      console.warn(
+        "KM77 Customizer: Error when trying to disable native pagination",
+        e
+      );
+    }
   }
 
   // Reset all pagination state (including end of content flag)
@@ -474,14 +578,23 @@ const KM77PaginationManager = (function () {
       console.warn("KM77 Customizer: Could not clear sessionStorage state", e);
     }
 
+    // Reset our state variables
     reachedEndOfContent = false;
     currentBatchCount = 0;
     batchInProgress = false;
     consecutiveLoadCount = 0;
     emptyResponseCount = 0;
     autoLoadScheduled = false;
+    previousContentSize = 0;
+    sameContentSizeCount = 0;
 
-    // Clear any existing interval
+    // Clear safety timeout if it exists
+    if (safetyTimeout) {
+      clearTimeout(safetyTimeout);
+      safetyTimeout = null;
+    }
+
+    // Clear auto-load interval
     if (loadMoreCheckInterval) {
       clearInterval(loadMoreCheckInterval);
       loadMoreCheckInterval = null;
@@ -517,6 +630,10 @@ const KM77PaginationManager = (function () {
     } catch (e) {
       console.warn("KM77 Customizer: Could not read sessionStorage state", e);
     }
+
+    // Store the initial row count when we start
+    initialRowCount = getTotalRowCount();
+    console.log(`KM77 Customizer: Initial row count: ${initialRowCount}`);
 
     // More responsive scroll handler with improved throttling
     let scrollTimeout;
@@ -559,6 +676,26 @@ const KM77PaginationManager = (function () {
         event.detail ? `(${event.detail.count} rows)` : ""
       );
 
+      // Update content size check
+      const currentSize = getTotalRowCount();
+      if (previousContentSize > 0 && currentSize === previousContentSize) {
+        sameContentSizeCount++;
+        console.log(
+          `KM77 Customizer: Content size unchanged (${currentSize}). Count: ${sameContentSizeCount}/${MAX_SAME_CONTENT_SIZE}`
+        );
+
+        if (sameContentSizeCount >= MAX_SAME_CONTENT_SIZE) {
+          console.log(
+            `KM77 Customizer: Content size hasn't changed after multiple attempts, likely at end of content`
+          );
+          setEndOfContentReached("No hay filas nuevas");
+          return;
+        }
+      } else {
+        sameContentSizeCount = 0;
+        previousContentSize = currentSize;
+      }
+
       if (event.detail && event.detail.count) {
         // Update batch counter with newly added rows
         currentBatchCount += event.detail.count;
@@ -598,6 +735,23 @@ const KM77PaginationManager = (function () {
             `KM77 Customizer: Reached absolute row limit (${ABSOLUTE_ROW_LIMIT})`
           );
           setEndOfContentReached("Límite de filas alcanzado");
+        }
+
+        // Check if we've loaded enough additional rows (doubled the initial count)
+        if (initialRowCount > 0) {
+          const currentCount = getTotalRowCount();
+          const loadedRows = currentCount - initialRowCount;
+          const percentIncrease = (loadedRows / initialRowCount) * 100;
+
+          if (percentIncrease >= 100) {
+            // Doubled the initial count
+            console.log(
+              `KM77 Customizer: Loaded ${loadedRows} additional rows (${percentIncrease.toFixed(
+                0
+              )}% increase)`
+            );
+            setEndOfContentReached("Carga completa");
+          }
         }
       }, 100);
     });
