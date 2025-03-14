@@ -117,17 +117,74 @@ const KM77RowProcessor = (function () {
     // Get the car details URL
     let carDetailsUrl = carLink.getAttribute("href");
 
-    // Make a single request to the main car details page with retry logic
-    makeCarDataRequest(
-      carId,
-      carDetailsUrl,
-      0,
-      speakersCell,
-      speedCell,
-      accelCell,
-      cylinderCell,
-      row
-    );
+    // Check cache first before making network request
+    const cachedCarData = KM77CacheManager.getCachedItem(carId, "carData");
+    const cachedEquipment = KM77CacheManager.getCachedItem(carId, "equipment");
+
+    if (cachedCarData) {
+      console.log(`KM77 Customizer: Using cached data for car ${carId}`);
+
+      // Process performance data from cache
+      KM77PerformanceDetector.processPerformanceData(
+        cachedCarData,
+        carId,
+        speedCell,
+        accelCell
+      );
+
+      // Update cylinder cell
+      const perfData = KM77.performanceData.get(carId);
+      if (perfData && perfData.cylinders && perfData.cylinders !== "-") {
+        cylinderCell.innerHTML = perfData.cylinders;
+        cylinderCell.style.color = "#0066cc";
+        cylinderCell.style.fontWeight = "bold";
+      } else {
+        cylinderCell.innerHTML = "-";
+      }
+
+      // If we also have cached equipment data, use it
+      if (cachedEquipment) {
+        KM77SpeakerDetector.processSpeakerData(
+          cachedEquipment,
+          carId,
+          speakersCell,
+          row
+        );
+        KM77UI.updateStatus(
+          ++KM77.processedCount,
+          KM77.mainTable.querySelectorAll("tbody tr.search").length
+        );
+      } else {
+        // Try to extract speaker data from main page
+        if (cachedCarData.includes("altavoces")) {
+          KM77SpeakerDetector.processSpeakerData(
+            cachedCarData,
+            carId,
+            speakersCell,
+            row
+          );
+          KM77UI.updateStatus(
+            ++KM77.processedCount,
+            KM77.mainTable.querySelectorAll("tbody tr.search").length
+          );
+        } else {
+          // Need to fetch equipment data
+          fetchEquipmentData(carId, carDetailsUrl, speakersCell, row);
+        }
+      }
+    } else {
+      // No cached data, make a request
+      makeCarDataRequest(
+        carId,
+        carDetailsUrl,
+        0,
+        speakersCell,
+        speedCell,
+        accelCell,
+        cylinderCell,
+        row
+      );
+    }
   }
 
   // Make a request to get car data with retry logic
@@ -151,6 +208,9 @@ const KM77RowProcessor = (function () {
 
         try {
           const content = response.responseText;
+
+          // Store the car data in cache
+          KM77CacheManager.setCachedItem(carId, "carData", content);
 
           // Process performance data (now includes cylinders)
           KM77PerformanceDetector.processPerformanceData(
@@ -177,57 +237,7 @@ const KM77RowProcessor = (function () {
           ) {
             // If the main page doesn't contain speaker info but has a link to equipment page,
             // make a second request just for speakers
-            const equipmentUrl = carDetailsUrl.replace(
-              "/datos",
-              "/datos/equipamiento"
-            );
-
-            GM_xmlhttpRequest({
-              method: "GET",
-              url: `https://www.km77.com${equipmentUrl}`,
-              timeout: 10000, // 10 seconds timeout
-              onload: function (eqResponse) {
-                try {
-                  KM77SpeakerDetector.processSpeakerData(
-                    eqResponse.responseText,
-                    carId,
-                    speakersCell,
-                    row
-                  );
-                } catch (err) {
-                  console.error(
-                    `Error processing speaker data for ${carId}:`,
-                    err
-                  );
-                  speakersCell.innerHTML = "-";
-                  KM77.speakerData.set(carId, "0");
-                }
-                KM77UI.updateStatus(
-                  ++KM77.processedCount,
-                  KM77.mainTable.querySelectorAll("tbody tr.search").length
-                );
-              },
-              onerror: function (error) {
-                console.error(
-                  `Error fetching equipment data for ${carId}: ${error}`
-                );
-                speakersCell.innerHTML = "-";
-                KM77.speakerData.set(carId, "0");
-                KM77UI.updateStatus(
-                  ++KM77.processedCount,
-                  KM77.mainTable.querySelectorAll("tbody tr.search").length
-                );
-              },
-              ontimeout: function () {
-                console.warn(`Timeout fetching equipment data for ${carId}`);
-                speakersCell.innerHTML = "-";
-                KM77.speakerData.set(carId, "0");
-                KM77UI.updateStatus(
-                  ++KM77.processedCount,
-                  KM77.mainTable.querySelectorAll("tbody tr.search").length
-                );
-              },
-            });
+            fetchEquipmentData(carId, carDetailsUrl, speakersCell, row);
           } else {
             // Try to extract speaker data from the main page
             try {
@@ -286,6 +296,79 @@ const KM77RowProcessor = (function () {
           cylinderCell,
           row,
           "timeout"
+        );
+      },
+    });
+  }
+
+  // Fetch equipment data separately
+  function fetchEquipmentData(carId, carDetailsUrl, speakersCell, row) {
+    const equipmentUrl = carDetailsUrl.replace("/datos", "/datos/equipamiento");
+
+    // Check if we have cached equipment data
+    const cachedEquipment = KM77CacheManager.getCachedItem(carId, "equipment");
+    if (cachedEquipment) {
+      console.log(
+        `KM77 Customizer: Using cached equipment data for car ${carId}`
+      );
+      KM77SpeakerDetector.processSpeakerData(
+        cachedEquipment,
+        carId,
+        speakersCell,
+        row
+      );
+      KM77UI.updateStatus(
+        ++KM77.processedCount,
+        KM77.mainTable.querySelectorAll("tbody tr.search").length
+      );
+      return;
+    }
+
+    GM_xmlhttpRequest({
+      method: "GET",
+      url: `https://www.km77.com${equipmentUrl}`,
+      timeout: 10000, // 10 seconds timeout
+      onload: function (eqResponse) {
+        try {
+          // Store equipment data in cache
+          KM77CacheManager.setCachedItem(
+            carId,
+            "equipment",
+            eqResponse.responseText
+          );
+
+          KM77SpeakerDetector.processSpeakerData(
+            eqResponse.responseText,
+            carId,
+            speakersCell,
+            row
+          );
+        } catch (err) {
+          console.error(`Error processing speaker data for ${carId}:`, err);
+          speakersCell.innerHTML = "-";
+          KM77.speakerData.set(carId, "0");
+        }
+        KM77UI.updateStatus(
+          ++KM77.processedCount,
+          KM77.mainTable.querySelectorAll("tbody tr.search").length
+        );
+      },
+      onerror: function (error) {
+        console.error(`Error fetching equipment data for ${carId}: ${error}`);
+        speakersCell.innerHTML = "-";
+        KM77.speakerData.set(carId, "0");
+        KM77UI.updateStatus(
+          ++KM77.processedCount,
+          KM77.mainTable.querySelectorAll("tbody tr.search").length
+        );
+      },
+      ontimeout: function () {
+        console.warn(`Timeout fetching equipment data for ${carId}`);
+        speakersCell.innerHTML = "-";
+        KM77.speakerData.set(carId, "0");
+        KM77UI.updateStatus(
+          ++KM77.processedCount,
+          KM77.mainTable.querySelectorAll("tbody tr.search").length
         );
       },
     });

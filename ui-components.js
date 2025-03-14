@@ -47,6 +47,9 @@ const KM77UI = (function () {
 
     // Create master filter toggle button
     createMasterFilterToggle();
+
+    // Create cache control button
+    createCacheControlButton();
   }
 
   // Create master filter toggle button
@@ -110,6 +113,135 @@ const KM77UI = (function () {
         currentState ? "disabled" : "enabled"
       );
     }, 2000);
+  }
+
+  // Create cache control button
+  function createCacheControlButton() {
+    const cacheButton = document.createElement("button");
+    cacheButton.id = "km77-cache-control";
+    cacheButton.className = "btn btn-info";
+    cacheButton.style.cssText = `
+      position: fixed;
+      top: 175px;
+      right: 20px;
+      z-index: 10000;
+      font-size: 14px;
+      padding: 8px 12px;
+      opacity: 0.95;
+      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.5);
+      border: 2px solid rgba(255, 255, 255, 0.5);
+      font-weight: bold;
+    `;
+    cacheButton.textContent = "Caché";
+
+    // Add click event to show cache controls modal
+    cacheButton.addEventListener("click", () => {
+      showCacheControlModal();
+    });
+
+    document.body.appendChild(cacheButton);
+    console.log("KM77 Customizer: Cache control button created");
+  }
+
+  // Show cache control modal
+  function showCacheControlModal() {
+    // Make sure old modal is removed if exists
+    const oldModal = document.getElementById("km77-cache-modal");
+    if (oldModal) {
+      document.body.removeChild(oldModal);
+    }
+
+    // Get cache statistics
+    const stats = KM77CacheManager.getCacheStats();
+
+    // Create modal container
+    const modalOverlay = document.createElement("div");
+    modalOverlay.id = "km77-cache-modal";
+    modalOverlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 10001;
+    `;
+
+    // Create modal content
+    const modalContent = document.createElement("div");
+    modalContent.style.cssText = `
+      background-color: white;
+      padding: 20px;
+      border-radius: 8px;
+      max-width: 500px;
+      width: 90%;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+      color: #333;
+    `;
+
+    // Add content
+    modalContent.innerHTML = `
+      <h3 style="margin-top: 0; border-bottom: 1px solid #ddd; padding-bottom: 10px;">
+        Control de Caché
+      </h3>
+      <div style="margin: 15px 0;">
+        <p><strong>Estado de la caché:</strong></p>
+        <ul>
+          <li>Elementos en caché: ${stats.totalItems}</li>
+          <li>Tamaño total: ${stats.totalSize}</li>
+          <li>Elementos por tipo: 
+            ${
+              stats.error
+                ? "Error al obtener detalle"
+                : stats.dataTypes && Object.keys(stats.dataTypes).length
+                ? Object.entries(stats.dataTypes)
+                    .map(
+                      ([type, count]) =>
+                        `<span style="margin-left: 5px; background: #eee; padding: 2px 5px; border-radius: 3px;">
+                    ${type}: ${count}
+                  </span>`
+                    )
+                    .join(" ")
+                : "Ninguno"
+            }
+          </li>
+        </ul>
+      </div>
+      <p>La caché reduce las peticiones al servidor y mejora el rendimiento.</p>
+      <div style="margin-top: 15px; display: flex; justify-content: space-between;">
+        <button id="km77-clear-cache" class="btn btn-danger">Limpiar Caché</button>
+        <button id="km77-close-cache-modal" class="btn btn-secondary">Cerrar</button>
+      </div>
+    `;
+
+    // Add to document
+    modalOverlay.appendChild(modalContent);
+    document.body.appendChild(modalOverlay);
+
+    // Add event listeners
+    document
+      .getElementById("km77-clear-cache")
+      .addEventListener("click", () => {
+        KM77CacheManager.clearAllCache();
+        showMessage("Caché eliminada correctamente", 2000);
+        document.body.removeChild(modalOverlay);
+      });
+
+    document
+      .getElementById("km77-close-cache-modal")
+      .addEventListener("click", () => {
+        document.body.removeChild(modalOverlay);
+      });
+
+    // Close on clicking outside
+    modalOverlay.addEventListener("click", (e) => {
+      if (e.target === modalOverlay) {
+        document.body.removeChild(modalOverlay);
+      }
+    });
   }
 
   // Toggle all filters on/off
@@ -647,5 +779,6 @@ const KM77UI = (function () {
     showMessage: showMessage,
     toggleAllFilters: toggleAllFilters,
     updateFilterUIControls: updateFilterUIControls,
+    showCacheControlModal: showCacheControlModal,
   };
 })();
