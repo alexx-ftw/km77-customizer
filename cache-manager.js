@@ -1,4 +1,4 @@
-// KM77 Customizer - Cache Manager Module
+// KM77 Customizer - Cache Manager Module - Version 3
 // Handles caching car data to reduce server load and improve filtering performance
 
 const KM77CacheManager = (function () {

@@ -1,4 +1,4 @@
-// KM77 Customizer - Header Manager Module
+// KM77 Customizer - Header Manager Module - Version 2
 // Handles table header creation and manipulation
 
 const KM77HeaderManager = (function () {

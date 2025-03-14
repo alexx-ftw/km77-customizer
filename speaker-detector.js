@@ -1,4 +1,4 @@
-// KM77 Customizer - Speaker Detector Module
+// KM77 Customizer - Speaker Detector Module - Version 2
 // Handles the detection and extraction of speaker information from car detail pages
 
 const KM77SpeakerDetector = (function () {

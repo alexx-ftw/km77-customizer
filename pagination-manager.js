@@ -1,4 +1,4 @@
-// KM77 Customizer - Pagination Manager Module
+// KM77 Customizer - Pagination Manager Module - Version 5
 // Handles automatic loading of more content when filtering is active
 
 const KM77PaginationManager = (function () {

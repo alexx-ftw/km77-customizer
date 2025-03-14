@@ -9,7 +9,7 @@ When making code changes, make sure no functionality is lost, unless its intende
 Make sure file name extensions are not duplicated by mistake.
 Make sure _not_ to add code block markers at the end of files, unless really intended.
 Do not create any new files without explcitly asking the user for permission.
-Try to keep files below 500 lines when possible.
+Keep files below 500 lines. For achieving this, very carefully split files into single-purpose files once they become too big.
 
-Extremely important: Increment the version value in the Core file of edited modules for Violentmonkey's cache bypassing:
+Extremely important: Increment the version value in the Core file of edited modules, as well as in the module itself, for Violentmonkey's cache bypassing:
 "[...].js?v=1" -> "[...].js?v=2" -> "[...].js?v=3"

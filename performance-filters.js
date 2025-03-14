@@ -1,4 +1,4 @@
-// KM77 Customizer - Performance Filters Module
+// KM77 Customizer - Performance Filters Module - Version 3
 // Manages speed and acceleration filter UI and functionality
 
 const KM77PerformanceFilters = (function () {

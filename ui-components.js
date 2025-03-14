@@ -1,4 +1,4 @@
-// KM77 Customizer - UI Components Module
+// KM77 Customizer - UI Components Module - Version 14
 // Handles status indicators and other UI elements
 
 const KM77UI = (function () {

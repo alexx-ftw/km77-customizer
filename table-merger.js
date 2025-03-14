@@ -1,4 +1,4 @@
-// KM77 Customizer - Table Merger Module
+// KM77 Customizer - Table Merger Module - Version 2
 // Handles merging multiple tables into one
 
 const KM77TableMerger = (function () {

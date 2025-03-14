@@ -1,4 +1,4 @@
-// KM77 Customizer - Core Filter Module
+// KM77 Customizer - Core Filter Module - Version 11
 // Central filtering functionality and combined filter application
 
 const KM77FilterCore = (function () {

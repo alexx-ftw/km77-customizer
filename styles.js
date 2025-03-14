@@ -1,4 +1,4 @@
-// KM77 Customizer - Styles Module
+// KM77 Customizer - Styles Module - Version 1
 // Handles CSS styling for the KM77 Customizer components
 
 const KM77Styles = (function () {

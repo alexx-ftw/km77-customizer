@@ -1,4 +1,4 @@
-// KM77 Customizer - Row Processor Module
+// KM77 Customizer - Row Processor Module - Version 6
 // Handles processing of car rows and data extraction
 
 const KM77RowProcessor = (function () {

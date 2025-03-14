@@ -1,4 +1,4 @@
-// KM77 Customizer - Filter Manager Module
+// KM77 Customizer - Filter Manager Module - Version 7
 // Coordinates all filtering modules and operations
 
 const KM77FilterManager = (function () {

@@ -1,4 +1,4 @@
-// KM77 Customizer - Speaker Filter Module
+// KM77 Customizer - Speaker Filter Module - Version 2
 // Manages speaker filter UI and functionality
 
 const KM77SpeakerFilter = (function () {

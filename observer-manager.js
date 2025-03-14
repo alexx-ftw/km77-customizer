@@ -1,4 +1,4 @@
-// KM77 Customizer - Observer Manager Module
+// KM77 Customizer - Observer Manager Module - Version 2
 // Handles DOM observation for dynamic content changes
 
 const KM77ObserverManager = (function () {

@@ -1,4 +1,4 @@
-// KM77 Customizer - Table Manager Module
+// KM77 Customizer - Table Manager Module - Version 1
 // Coordinates all table-related modules
 
 const KM77TableManager = (function () {

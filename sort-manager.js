@@ -1,4 +1,4 @@
-// KM77 Customizer - Sort Manager Module
+// KM77 Customizer - Sort Manager Module - Version 1
 // Handles table sorting functionality
 
 const KM77SortManager = (function () {

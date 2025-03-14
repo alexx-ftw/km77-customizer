@@ -1,4 +1,4 @@
-// KM77 Customizer - Performance Detector Module
+// KM77 Customizer - Performance Detector Module - Version 5
 // Handles the detection and extraction of performance metrics (speed, acceleration)
 
 const KM77PerformanceDetector = (function () {
