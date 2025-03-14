@@ -11,5 +11,5 @@ Make sure _not_ to add code block markers at the end of files, unless really int
 Do not create any new files without explcitly asking the user for permission.
 Try to keep files below 500 lines when possible.
 
-Extremely important: When editing a module file, modify its version in the Core file by adding one to the already present version number, or add if missing:
-"[...].js?v=1" -> "[...].js?v=2"
+Extremely important: Increment the version value in the Core file of edited modules for Violentmonkey's cache bypassing:
+"[...].js?v=1" -> "[...].js?v=2" -> "[...].js?v=3"

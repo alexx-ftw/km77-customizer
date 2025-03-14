@@ -9,8 +9,8 @@
 // @exclude     https://www.km77.com/coches/*/*/*/*/*
 // @grant       GM_xmlhttpRequest
 // @connect     www.km77.com
-// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/cache-manager.js?v=1
-// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/row-processor.js?v=5
+// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/cache-manager.js?v=3
+// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/row-processor.js?v=6
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/header-manager.js?v=2
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/table-merger.js?v=2
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/sort-manager.js?v=1
@@ -23,7 +23,7 @@
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/performance-filters.js?v=3
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/pagination-manager.js?v=3
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/filter-manager.js?v=7
-// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/ui-components.js?v=13
+// @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/ui-components.js?v=14
 // @require     https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/styles.js?v=1
 // @downloadUrl https://raw.githubusercontent.com/alexx-ftw/km77-customizer/main/km77-core.js
 // ==/UserScript==

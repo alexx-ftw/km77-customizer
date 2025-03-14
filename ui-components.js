@@ -719,6 +719,18 @@ const KM77UI = (function () {
   function updateStatus(processed, total) {
     if (!KM77.statusDiv) return;
 
+    // Skip update if nothing changed
+    if (
+      KM77.statusDiv.getAttribute("data-processed") === processed.toString() &&
+      KM77.statusDiv.getAttribute("data-total") === total.toString()
+    ) {
+      return;
+    }
+
+    // Store current values to prevent redundant updates
+    KM77.statusDiv.setAttribute("data-processed", processed.toString());
+    KM77.statusDiv.setAttribute("data-total", total.toString());
+
     // Ensure the processed count doesn't exceed the total
     if (processed > total) {
       processed = total;
@@ -743,12 +755,16 @@ const KM77UI = (function () {
           // Check if we've processed more since marking complete
           const currentTotal =
             KM77.mainTable.querySelectorAll("tbody tr.search").length;
-          if (currentTotal <= total) {
+          const currentProcessed = parseInt(
+            KM77.statusDiv.getAttribute("data-processed") || "0"
+          );
+
+          if (currentProcessed >= currentTotal) {
             KM77.statusDiv.style.display = "none";
           } else {
             // More content loaded, update status
             KM77.statusDiv.removeAttribute("data-completed");
-            updateStatus(KM77.processedCount, currentTotal);
+            updateStatus(currentProcessed, currentTotal);
           }
         }, 3000);
       }

@@ -8,6 +8,9 @@ const KM77RowProcessor = (function () {
   const retryAttempts = new Map();
   const MAX_RETRIES = 2;
 
+  // Keep track of rows being processed to avoid overlapping requests
+  const processingRows = new Set();
+
   // Process all existing car rows
   function processExistingRows() {
     if (KM77.isProcessing) return;
@@ -16,12 +19,25 @@ const KM77RowProcessor = (function () {
     const carRows = Array.from(
       KM77.mainTable.querySelectorAll("tbody tr.search")
     );
+
+    // Get actual number of rows that need processing
+    const unprocessedRows = carRows.filter((row) => {
+      const carId = row.getAttribute("data-nql");
+      const rowIndex = Array.from(
+        KM77.mainTable.querySelectorAll("tbody tr.search")
+      ).indexOf(row);
+      const rowId = carId ? `${carId}_${rowIndex}` : `row_${rowIndex}`;
+      return !KM77.processedRows.has(rowId);
+    });
+
     console.log(
-      `KM77 Customizer: Found ${carRows.length} car listings in main table.`
+      `KM77 Customizer: Found ${carRows.length} total car listings, ${unprocessedRows.length} need processing.`
     );
 
-    // Reset processed count to ensure accurate tracking
-    KM77.processedCount = 0;
+    // Only reset the processed count if we're starting a fresh batch
+    if (KM77.processedCount >= carRows.length || KM77.processedCount === 0) {
+      KM77.processedCount = 0;
+    }
 
     // Process each row with its index to ensure unique identification
     carRows.forEach((row, index) => processCarRow(row, index));
@@ -35,10 +51,13 @@ const KM77RowProcessor = (function () {
     const carId = row.getAttribute("data-nql");
     const rowId = carId ? `${carId}_${rowIndex}` : `row_${rowIndex}`;
 
-    // Skip if this exact row was already processed
-    if (!carId || KM77.processedRows.has(rowId)) {
+    // Skip if this exact row was already processed or is being processed
+    if (!carId || KM77.processedRows.has(rowId) || processingRows.has(rowId)) {
       return;
     }
+
+    // Mark this row as currently being processed
+    processingRows.add(rowId);
 
     // Mark this specific row as processed
     KM77.processedRows.set(rowId, true);
@@ -255,6 +274,10 @@ const KM77RowProcessor = (function () {
               speakersCell.innerHTML = "-";
               KM77.speakerData.set(carId, "0");
             }
+            // Mark this row as processed now that we're done with it
+            KM77.processedRows.set(rowId, true);
+            processingRows.delete(rowId);
+
             KM77UI.updateStatus(
               ++KM77.processedCount,
               KM77.mainTable.querySelectorAll("tbody tr.search").length
@@ -269,6 +292,10 @@ const KM77RowProcessor = (function () {
             accelCell,
             cylinderCell
           );
+          // Mark as processed even on error to avoid repeated attempts
+          KM77.processedRows.set(rowId, true);
+          processingRows.delete(rowId);
+
           KM77UI.updateStatus(
             ++KM77.processedCount,
             KM77.mainTable.querySelectorAll("tbody tr.search").length
@@ -320,6 +347,10 @@ const KM77RowProcessor = (function () {
         speakersCell,
         row
       );
+      // Mark as processed when done
+      KM77.processedRows.set(rowId, true);
+      processingRows.delete(rowId);
+
       KM77UI.updateStatus(
         ++KM77.processedCount,
         KM77.mainTable.querySelectorAll("tbody tr.search").length
@@ -351,6 +382,11 @@ const KM77RowProcessor = (function () {
           speakersCell.innerHTML = "-";
           KM77.speakerData.set(carId, "0");
         }
+
+        // Always mark as processed when we're done
+        KM77.processedRows.set(rowId, true);
+        processingRows.delete(rowId);
+
         KM77UI.updateStatus(
           ++KM77.processedCount,
           KM77.mainTable.querySelectorAll("tbody tr.search").length
@@ -360,6 +396,11 @@ const KM77RowProcessor = (function () {
         console.error(`Error fetching equipment data for ${carId}: ${error}`);
         speakersCell.innerHTML = "-";
         KM77.speakerData.set(carId, "0");
+
+        // Mark as processed even on error
+        KM77.processedRows.set(rowId, true);
+        processingRows.delete(rowId);
+
         KM77UI.updateStatus(
           ++KM77.processedCount,
           KM77.mainTable.querySelectorAll("tbody tr.search").length
@@ -369,6 +410,11 @@ const KM77RowProcessor = (function () {
         console.warn(`Timeout fetching equipment data for ${carId}`);
         speakersCell.innerHTML = "-";
         KM77.speakerData.set(carId, "0");
+
+        // Mark as processed even on timeout
+        KM77.processedRows.set(rowId, true);
+        processingRows.delete(rowId);
+
         KM77UI.updateStatus(
           ++KM77.processedCount,
           KM77.mainTable.querySelectorAll("tbody tr.search").length
