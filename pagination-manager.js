@@ -1,4 +1,4 @@
-// KM77 Customizer - Pagination Manager Module - Version 6
+// KM77 Customizer - Pagination Manager Module - Version 7
 // Handles automatic loading of more content when filtering is active
 
 const KM77PaginationManager = (function () {
@@ -16,6 +16,10 @@ const KM77PaginationManager = (function () {
   // Flag to track when we've reached the end of content
   let reachedEndOfContent = false;
 
+  // Hard limit to prevent runaway loading
+  const ABSOLUTE_ROW_LIMIT = 500; // Stop loading after this many total rows
+  const ABSOLUTE_LOAD_LIMIT = 15; // Maximum number of loads regardless of session settings
+
   // Add loading control parameters
   const COOLDOWN_PERIOD = 5000; // 5 seconds between auto-load attempts
   const MAX_CONSECUTIVE_LOADS = 3; // Maximum consecutive auto-loads
@@ -28,121 +32,186 @@ const KM77PaginationManager = (function () {
   let emptyResponseCount = 0;
   const MAX_EMPTY_RESPONSES = 2; // After this many empty responses, assume we're at the end
 
+  // Add a flag to track if an auto-load is already scheduled to prevent multiple loads
+  let autoLoadScheduled = false;
+
+  // Helper to get all currently visible rows
+  function getVisibleRows() {
+    return Array.from(
+      KM77.mainTable.querySelectorAll("tbody tr.search")
+    ).filter((row) => row.style.display !== "none");
+  }
+
+  // Helper to count total rows
+  function getTotalRowCount() {
+    return KM77.mainTable.querySelectorAll("tbody tr.search").length;
+  }
+
+  // Helper to determine if more loading should be allowed
+  function shouldAllowMoreLoading() {
+    // Don't load if filters aren't active
+    if (
+      !KM77.filterStatusDiv ||
+      KM77.filterStatusDiv.style.display !== "block"
+    ) {
+      return false;
+    }
+
+    // Don't load if we've already reached the end
+    if (reachedEndOfContent) {
+      return false;
+    }
+
+    // Don't load if we've hit the total loads limit
+    if (totalLoadsThisSession >= ABSOLUTE_LOAD_LIMIT) {
+      console.log(
+        `KM77 Customizer: Reached absolute load limit (${ABSOLUTE_LOAD_LIMIT}), stopping all loads`
+      );
+      setEndOfContentReached("Límite de cargas alcanzado");
+      return false;
+    }
+
+    // Check if we've hit the absolute row limit
+    if (getTotalRowCount() >= ABSOLUTE_ROW_LIMIT) {
+      console.log(
+        `KM77 Customizer: Reached absolute row limit (${ABSOLUTE_ROW_LIMIT}), stopping all loads`
+      );
+      setEndOfContentReached("Límite de filas alcanzado");
+      return false;
+    }
+
+    return true;
+  }
+
   // Function to check scroll position and trigger "load more" if needed
   function checkScrollPositionForLoadMore() {
-    // Only check if filters are active (some content is hidden) and we haven't reached the end
-    if (
-      KM77.filterStatusDiv &&
-      KM77.filterStatusDiv.style.display === "block" &&
-      !reachedEndOfContent
-    ) {
-      const scrollPosition = window.scrollY + window.innerHeight;
-      const documentHeight = document.documentElement.scrollHeight;
-
-      // Count visible rows to determine if we need to load more
-      const visibleRows = Array.from(
-        KM77.mainTable.querySelectorAll("tbody tr.search")
-      ).filter((row) => row.style.display !== "none");
-
-      // Get the position of the last visible row if available
-      let lastRowPosition = documentHeight;
-      if (visibleRows.length > 0) {
-        const lastVisibleRow = visibleRows[visibleRows.length - 1];
-        const rect = lastVisibleRow.getBoundingClientRect();
-        lastRowPosition = window.scrollY + rect.bottom;
-      }
-
-      // Only trigger load more when:
-      // 1. We're very close to the bottom of the page (scrolling down)
-      // 2. We haven't already loaded BATCH_SIZE cars in this batch
-      // 3. We haven't exceeded our loading limits
-      // 4. We haven't reached the end of content
-      const now = Date.now();
-      const cooledDown = now - lastLoadTime > COOLDOWN_PERIOD;
-      const withinLimits = totalLoadsThisSession < MAX_TOTAL_LOADS_PER_SESSION;
-
-      if (
-        !batchInProgress &&
-        currentBatchCount < BATCH_SIZE &&
-        cooledDown &&
-        withinLimits &&
-        !reachedEndOfContent &&
-        (scrollPosition + 100 >= documentHeight || // Very close to bottom
-          scrollPosition + window.innerHeight >= lastRowPosition - 100) // Close to last visible row
-      ) {
-        triggerLoadMore();
-      }
+    // First check all the conditions that would prevent loading more
+    if (!shouldAllowMoreLoading()) {
+      return false;
     }
+
+    const scrollPosition = window.scrollY + window.innerHeight;
+    const documentHeight = document.documentElement.scrollHeight;
+
+    // Count visible rows to determine if we need to load more
+    const visibleRows = getVisibleRows();
+
+    // Get the position of the last visible row if available
+    let lastRowPosition = documentHeight;
+    if (visibleRows.length > 0) {
+      const lastVisibleRow = visibleRows[visibleRows.length - 1];
+      const rect = lastVisibleRow.getBoundingClientRect();
+      lastRowPosition = window.scrollY + rect.bottom;
+    }
+
+    // Cooling down controls
+    const now = Date.now();
+    const cooledDown = now - lastLoadTime > COOLDOWN_PERIOD;
+    const withinLimits = totalLoadsThisSession < MAX_TOTAL_LOADS_PER_SESSION;
+
+    if (
+      !batchInProgress &&
+      currentBatchCount < BATCH_SIZE &&
+      cooledDown &&
+      withinLimits &&
+      (scrollPosition + 100 >= documentHeight || // Very close to bottom
+        scrollPosition + window.innerHeight >= lastRowPosition - 100) // Close to last visible row
+    ) {
+      triggerLoadMore();
+      return true;
+    }
+
+    return false;
   }
 
   // Set up or clear automatic load more checker
   function setupAutoLoadMoreChecker(isActive) {
-    // Clear any existing interval
+    // Always clear any existing interval first
     if (loadMoreCheckInterval) {
       clearInterval(loadMoreCheckInterval);
       loadMoreCheckInterval = null;
     }
 
-    // If filters are active, set up an interval to periodically check for more content
-    if (isActive && !reachedEndOfContent) {
-      loadMoreCheckInterval = setInterval(() => {
-        // Check if we're near the bottom of visible content
-        const visibleRows = Array.from(
-          KM77.mainTable.querySelectorAll("tbody tr.search")
-        ).filter((row) => row.style.display !== "none");
+    // Don't set up a new interval if we've reached the end or if no filters are active
+    if (!isActive || reachedEndOfContent) {
+      return;
+    }
 
-        // Check if we're within our loading limits
+    // Check if auto-load is enabled in settings
+    const autoLoadEnabled = localStorage.getItem("km77AutoLoad") !== "false";
+    if (!autoLoadEnabled) {
+      console.log("KM77 Customizer: Auto-load disabled in settings");
+      return;
+    }
+
+    // Set up interval to periodically check for more content
+    loadMoreCheckInterval = setInterval(() => {
+      // First check if we should allow more loading
+      if (!shouldAllowMoreLoading()) {
+        clearInterval(loadMoreCheckInterval);
+        loadMoreCheckInterval = null;
+        return;
+      }
+
+      // Avoid scheduling another auto-load if one is already pending
+      if (autoLoadScheduled || batchInProgress) {
+        return;
+      }
+
+      // Check if we've hit the consecutive load limit
+      if (consecutiveLoadCount >= MAX_CONSECUTIVE_LOADS) {
+        console.log(
+          "KM77 Customizer: Reached consecutive load limit, stopping auto-load"
+        );
+        clearInterval(loadMoreCheckInterval);
+        loadMoreCheckInterval = null;
+        return;
+      }
+
+      // Check if there are NO visible rows with current filters
+      const visibleRows = getVisibleRows();
+      if (visibleRows.length === 0) {
+        // Don't trigger too frequently
         const now = Date.now();
-        const cooledDown = now - lastLoadTime > COOLDOWN_PERIOD;
-        const withinConsecutiveLimit =
-          consecutiveLoadCount < MAX_CONSECUTIVE_LOADS;
-        const withinTotalLimit =
-          totalLoadsThisSession < MAX_TOTAL_LOADS_PER_SESSION;
+        if (now - lastAttemptTime > 3000) {
+          console.log(
+            "KM77 Customizer: Auto-triggering load more as no visible rows with current filters"
+          );
 
-        // Only auto-load more if:
-        // 1. There are NO visible rows (nothing to show with current filters)
-        // 2. We haven't already loaded BATCH_SIZE cars in this batch
-        // 3. We're within our loading limits
-        // 4. We haven't reached the end of content
-        if (
-          visibleRows.length === 0 &&
-          !batchInProgress &&
-          currentBatchCount < BATCH_SIZE &&
-          cooledDown &&
-          withinConsecutiveLimit &&
-          withinTotalLimit &&
-          !reachedEndOfContent
-        ) {
-          // Don't trigger too frequently
-          const now = Date.now();
-          if (now - lastAttemptTime > 3000) {
-            lastAttemptTime = now;
-            console.log(
-              "KM77 Customizer: Auto-triggering load more as no visible rows with current filters"
-            );
+          // Mark that we've scheduled an auto-load to prevent duplicates
+          autoLoadScheduled = true;
+
+          // Use timeout for better performance and to avoid race conditions
+          setTimeout(() => {
             triggerLoadMore();
             consecutiveLoadCount++;
-          }
-        } else if (visibleRows.length > 0) {
-          // Reset consecutive count when we have visible rows
-          consecutiveLoadCount = 0;
+            autoLoadScheduled = false;
+          }, 500);
+
+          lastAttemptTime = now;
         }
-      }, 2000); // Check every 2 seconds
-    }
+      } else {
+        // Reset consecutive count when we have visible rows
+        consecutiveLoadCount = 0;
+      }
+    }, 2000); // Check every 2 seconds
+
+    console.log("KM77 Customizer: Auto load checker interval set up");
   }
 
   // Function to trigger loading more content using multiple strategies
   function triggerLoadMore() {
-    // Don't attempt to load if we've reached the end of content
-    if (reachedEndOfContent) {
-      console.log("KM77 Customizer: Reached end of content, not loading more");
-      updateEndOfContentUI(true);
+    // Final check to make sure we can still load more
+    if (!shouldAllowMoreLoading()) {
       return;
     }
 
     // Try to find the load more trigger
     const pagedContent = document.querySelector(".js-paged-content");
-    if (!pagedContent) return;
+    if (!pagedContent) {
+      console.log("KM77 Customizer: No paged content element found");
+      return;
+    }
 
     // Check if there's more content to load
     const nextUrl = pagedContent.getAttribute("data-paged-content-next-url");
@@ -154,213 +223,90 @@ const KM77PaginationManager = (function () {
       console.log(
         "KM77 Customizer: No next URL available, reached end of content"
       );
-      setEndOfContentReached();
+      setEndOfContentReached("No hay más URLs");
       return;
     }
 
-    if (nextUrl && !isLoading) {
-      console.log("KM77 Customizer: Attempting to trigger load more...");
-      lastAttemptTime = Date.now();
-      lastLoadTime = Date.now();
-      batchInProgress = true;
-      totalLoadsThisSession++;
-
-      // Update the status to show we're trying to load more
-      if (KM77.statusDiv) {
-        KM77.statusDiv.innerHTML = `Cargando más resultados... (${totalLoadsThisSession}/${MAX_TOTAL_LOADS_PER_SESSION})`;
-        KM77.statusDiv.style.display = "block";
-        KM77.statusDiv.removeAttribute("data-completed");
-      }
-
-      // Update paged content loading state to prevent multiple simultaneous loads
-      pagedContent.setAttribute("data-paged-content-loading", "true");
-
-      // Strategy 1: Try to find and click the load more button if it exists
-      const loadMoreButton = document.querySelector(
-        ".js-paged-content-load-more"
-      );
-      if (loadMoreButton) {
-        console.log("KM77 Customizer: Found load more button, clicking it");
-        loadMoreButton.click();
-        return;
-      }
-
-      // Strategy 2: Force scroll to bottom of document
-      const forceScroll = () => {
-        // Scroll to bottom
-        window.scrollTo(0, document.body.scrollHeight);
-        // And again with a slight difference to trigger events
-        setTimeout(
-          () => window.scrollTo(0, document.body.scrollHeight - 1),
-          50
-        );
-        setTimeout(() => window.scrollTo(0, document.body.scrollHeight), 100);
-      };
-
-      forceScroll();
-
-      // Strategy 3: Direct JavaScript execution via injected script
-      setTimeout(() => {
-        try {
-          const injectScript = document.createElement("script");
-          injectScript.textContent = `
-            try {
-              // Find paged content element
-              const pagedContent = document.querySelector(".js-paged-content");
-              if (!pagedContent) return;
-              
-              // First attempt: Look for the site's own paged content handler
-              if (typeof window.PagedContent === 'function') {
-                // Try to find the instance through DOM
-                const instances = Object.values(window).filter(
-                  v => v && typeof v === 'object' && v.constructor && 
-                  v.constructor.name === 'PagedContent' && v.loadMore
-                );
-                if (instances.length > 0) {
-                  console.log("KM77 Customizer: Found paged content instance, calling loadMore()");
-                  instances[0].loadMore();
-                  return;
-                }
-              }
-              
-              // Direct way to simulate pagination click if we find the elements
-              const paginationLinks = document.querySelectorAll('a.page-link');
-              if (paginationLinks.length > 0) {
-                for (let link of paginationLinks) {
-                  if (link.getAttribute('rel') === 'next' || link.textContent.includes('›')) {
-                    console.log("KM77 Customizer: Found pagination link, clicking it");
-                    link.click();
-                    return;
-                  }
-                }
-              }
-              
-              // Second attempt: Use jQuery's trigger method
-              if (typeof jQuery !== 'undefined') {
-                console.log("KM77 Customizer: Triggering with jQuery");
-                jQuery(pagedContent).trigger('scroll');
-                jQuery(window).trigger('scroll');
-                jQuery(".js-paged-content-load-more").trigger('click');
-                return;
-              }
-              
-              // Third attempt: Use fetch to manually load content
-              const nextUrl = pagedContent.getAttribute("data-paged-content-next-url");
-              if (nextUrl && typeof fetch === 'function') {
-                console.log("KM77 Customizer: Attempting to fetch next page:", nextUrl);
-                fetch(nextUrl)
-                  .then(r => r.text())
-                  .then(html => {
-                    const parser = new DOMParser();
-                    const doc = parser.parseFromString(html, 'text/html');
-                    
-                    // Find the table rows in the fetched content
-                    const newRows = doc.querySelectorAll('tr.search');
-                    if (newRows.length) {
-                      console.log("KM77 Customizer: Found", newRows.length, "new rows to add");
-                      
-                      // Find target table body
-                      const tbody = document.querySelector('table.table.table-hover tbody');
-                      if (tbody) {
-                        // Add the new rows
-                        newRows.forEach(row => {
-                          const imported = document.importNode(row, true);
-                          tbody.appendChild(imported);
-                        });
-                        
-                        // Update paged content attributes
-                        const newPagedContent = doc.querySelector('.js-paged-content');
-                        if (newPagedContent) {
-                          pagedContent.setAttribute(
-                            'data-paged-content-next-url', 
-                            newPagedContent.getAttribute('data-paged-content-next-url') || ''
-                          );
-                          
-                          // Update offset
-                          const currentOffset = parseInt(pagedContent.getAttribute('data-paged-content-offset') || '0');
-                          pagedContent.setAttribute(
-                            'data-paged-content-offset', 
-                            (currentOffset + newRows.length).toString()
-                          );
-                        }
-                        
-                        // Reset loading state
-                        pagedContent.setAttribute('data-paged-content-loading', 'false');
-                        
-                        // Dispatch event to signal new content
-                        document.dispatchEvent(new CustomEvent('km77NewRowsAdded', {
-                          detail: { count: newRows.length }
-                        }));
-                        
-                        // Check if no next URL was found
-                        const newNextUrl = newPagedContent ? newPagedContent.getAttribute('data-paged-content-next-url') : null;
-                        if (!newNextUrl) {
-                          console.log("KM77 Customizer: No next URL in response, likely at end of content");
-                          document.dispatchEvent(new CustomEvent('km77EndOfContent'));
-                        }
-                      }
-                    } else {
-                      // No rows found - we've reached the end
-                      console.log("KM77 Customizer: No rows in response, reached end of content");
-                      document.dispatchEvent(new CustomEvent('km77EndOfContent'));
-                      
-                      // Reset loading state
-                      pagedContent.setAttribute('data-paged-content-loading', 'false');
-                    }
-                  })
-                  .catch(err => {
-                    console.error("KM77 Customizer: Error fetching more content:", err);
-                    // Reset loading state on error
-                    pagedContent.setAttribute('data-paged-content-loading', 'false');
-                  });
-              } else {
-                // Reset loading state if no next URL
-                pagedContent.setAttribute('data-paged-content-loading', 'false');
-                if (!nextUrl) {
-                  console.log("KM77 Customizer: No next URL, reached end of content");
-                  document.dispatchEvent(new CustomEvent('km77EndOfContent'));
-                }
-              }
-            } catch (e) {
-              console.error("KM77 Customizer: Error in load more script:", e);
-              // Reset loading state on exception
-              const pagedContent = document.querySelector(".js-paged-content");
-              if (pagedContent) {
-                pagedContent.setAttribute('data-paged-content-loading', 'false');
-              }
-            }
-          `;
-          document.body.appendChild(injectScript);
-          setTimeout(() => {
-            document.body.removeChild(injectScript);
-
-            // Check if we've successfully loaded more
-            setTimeout(() => {
-              checkIfLoadSucceeded(nextUrl);
-            }, 2000);
-          }, 300);
-        } catch (error) {
-          console.error(
-            "KM77 Customizer: Error injecting load more script:",
-            error
-          );
-          // Reset loading state on error
-          if (pagedContent) {
-            pagedContent.setAttribute("data-paged-content-loading", "false");
-          }
-          batchInProgress = false;
-        }
-      }, 300);
-    } else if (totalLoadsThisSession >= MAX_TOTAL_LOADS_PER_SESSION) {
-      // Show a message if we've reached the load limit
-      if (KM77.statusDiv) {
-        KM77.statusDiv.innerHTML = `Límite de carga alcanzado (${MAX_TOTAL_LOADS_PER_SESSION}). Recarga la página para más.`;
-        KM77.statusDiv.style.display = "block";
-        setTimeout(() => {
-          KM77.statusDiv.style.display = "none";
-        }, 5000);
-      }
+    // Don't start a new load if one is already in progress
+    if (isLoading) {
+      console.log("KM77 Customizer: Load already in progress, skipping");
+      return;
     }
+
+    console.log(
+      `KM77 Customizer: Attempting to trigger load more... (${
+        totalLoadsThisSession + 1
+      }/${MAX_TOTAL_LOADS_PER_SESSION})`
+    );
+    lastAttemptTime = Date.now();
+    lastLoadTime = Date.now();
+    batchInProgress = true;
+    totalLoadsThisSession++;
+
+    // Update the status to show we're trying to load more
+    if (KM77.statusDiv) {
+      KM77.statusDiv.innerHTML = `Cargando más resultados... (${totalLoadsThisSession}/${MAX_TOTAL_LOADS_PER_SESSION})`;
+      KM77.statusDiv.style.display = "block";
+      KM77.statusDiv.removeAttribute("data-completed");
+    }
+
+    // Update paged content loading state to prevent multiple simultaneous loads
+    pagedContent.setAttribute("data-paged-content-loading", "true");
+
+    // Strategy 1: Try to find and click the load more button if it exists
+    const loadMoreButton = document.querySelector(
+      ".js-paged-content-load-more"
+    );
+    if (loadMoreButton) {
+      console.log("KM77 Customizer: Found load more button, clicking it");
+      loadMoreButton.click();
+
+      // Set a timeout to check if the load succeeded
+      setTimeout(() => {
+        checkIfLoadSucceeded(nextUrl);
+      }, 2000);
+      return;
+    }
+
+    // Strategy 2: Force scroll to bottom of document
+    const forceScroll = () => {
+      // Scroll to bottom
+      window.scrollTo(0, document.body.scrollHeight);
+      // And again with a slight difference to trigger events
+      setTimeout(() => window.scrollTo(0, document.body.scrollHeight - 1), 50);
+      setTimeout(() => window.scrollTo(0, document.body.scrollHeight), 100);
+    };
+
+    forceScroll();
+
+    // Strategy 3: Direct JavaScript execution via injected script
+    setTimeout(() => {
+      try {
+        const injectScript = document.createElement("script");
+        injectScript.textContent = `
+          // ...existing code...
+        `;
+        document.body.appendChild(injectScript);
+        setTimeout(() => {
+          document.body.removeChild(injectScript);
+
+          // Check if we've successfully loaded more
+          setTimeout(() => {
+            checkIfLoadSucceeded(nextUrl);
+          }, 2000);
+        }, 300);
+      } catch (error) {
+        console.error(
+          "KM77 Customizer: Error injecting load more script:",
+          error
+        );
+        // Reset loading state on error
+        if (pagedContent) {
+          pagedContent.setAttribute("data-paged-content-loading", "false");
+        }
+        batchInProgress = false;
+      }
+    }, 300);
   }
 
   // Function to check if load was successful, try alternative if not
@@ -377,7 +323,7 @@ const KM77PaginationManager = (function () {
       console.log(
         "KM77 Customizer: No next URL after load, reached end of content"
       );
-      setEndOfContentReached();
+      setEndOfContentReached("No hay más URLs");
       return;
     }
 
@@ -392,7 +338,7 @@ const KM77PaginationManager = (function () {
         console.log(
           `KM77 Customizer: ${emptyResponseCount} consecutive empty responses, likely at end of content`
         );
-        setEndOfContentReached();
+        setEndOfContentReached("No hay respuestas nuevas");
         return;
       }
 
@@ -415,7 +361,12 @@ const KM77PaginationManager = (function () {
   // Function to fetch more content directly from the server
   function fetchMoreContentDirectly(url) {
     if (!url) {
-      setEndOfContentReached();
+      setEndOfContentReached("URL no válida");
+      return;
+    }
+
+    // One last check in case conditions changed during async operations
+    if (!shouldAllowMoreLoading()) {
       return;
     }
 
@@ -424,131 +375,33 @@ const KM77PaginationManager = (function () {
       method: "GET",
       url: url,
       onload: function (response) {
-        if (response.status === 200) {
-          const content = response.responseText;
-          const parser = new DOMParser();
-          const doc = parser.parseFromString(content, "text/html");
-
-          // Find new rows
-          const newRows = doc.querySelectorAll("tr.search");
-          console.log(
-            `KM77 Customizer: Direct fetch found ${newRows.length} rows`
-          );
-
-          if (newRows.length > 0) {
-            // Get the table body
-            const tbody = document.querySelector(
-              "table.table.table-hover tbody"
-            );
-            if (tbody) {
-              // Add the new rows
-              newRows.forEach((row) => {
-                const clonedRow = document.importNode(row, true);
-                tbody.appendChild(clonedRow);
-              });
-
-              // Update the next URL
-              const pagedContent = document.querySelector(".js-paged-content");
-              const newPagedContent = doc.querySelector(".js-paged-content");
-
-              if (pagedContent && newPagedContent) {
-                const newNextUrl = newPagedContent.getAttribute(
-                  "data-paged-content-next-url"
-                );
-
-                // Check if there's no next URL in the response
-                if (!newNextUrl) {
-                  console.log(
-                    "KM77 Customizer: No next URL in response, reached end of content"
-                  );
-                  setEndOfContentReached();
-                } else {
-                  pagedContent.setAttribute(
-                    "data-paged-content-next-url",
-                    newNextUrl
-                  );
-                }
-
-                // Update offset
-                const currentOffset = parseInt(
-                  pagedContent.getAttribute("data-paged-content-offset") || "0"
-                );
-                pagedContent.setAttribute(
-                  "data-paged-content-offset",
-                  (currentOffset + newRows.length).toString()
-                );
-              }
-
-              // Trigger event to process the new rows
-              document.dispatchEvent(
-                new CustomEvent("km77NewRowsAdded", {
-                  detail: { count: newRows.length },
-                })
-              );
-
-              console.log(
-                "KM77 Customizer: Successfully added new rows via direct fetch"
-              );
-              if (KM77.statusDiv) {
-                KM77.statusDiv.style.display = "none";
-              }
-
-              // Update batch count and reset batch status
-              currentBatchCount += newRows.length;
-              batchInProgress = false;
-              // Reset empty response counter on success
-              emptyResponseCount = 0;
-            }
-          } else {
-            console.log(
-              "KM77 Customizer: No new rows in response, reached end of content"
-            );
-            setEndOfContentReached();
-            batchInProgress = false;
-          }
-        } else {
-          console.error(
-            `KM77 Customizer: Direct fetch failed with status ${response.status}`
-          );
-          batchInProgress = false;
-
-          // If we got an error response, increment empty count
-          emptyResponseCount++;
-          if (emptyResponseCount >= MAX_EMPTY_RESPONSES) {
-            setEndOfContentReached();
-          }
-
-          if (KM77.statusDiv) {
-            KM77.statusDiv.innerHTML = "Error al cargar más resultados";
-            setTimeout(() => {
-              KM77.statusDiv.style.display = "none";
-            }, 3000);
-          }
-        }
+        // ...existing code...
       },
       onerror: function (error) {
-        console.error("KM77 Customizer: Direct fetch error", error);
-        batchInProgress = false;
-
-        // If we got an error, increment empty count
-        emptyResponseCount++;
-        if (emptyResponseCount >= MAX_EMPTY_RESPONSES) {
-          setEndOfContentReached();
-        }
-
-        if (KM77.statusDiv) {
-          KM77.statusDiv.innerHTML = "Error al cargar más resultados";
-          setTimeout(() => {
-            KM77.statusDiv.style.display = "none";
-          }, 3000);
-        }
+        // ...existing code...
       },
     });
   }
 
   // Flag that we've reached the end of available content
-  function setEndOfContentReached() {
+  function setEndOfContentReached(reason = "") {
+    if (reachedEndOfContent) {
+      // Already marked as reached end, don't do it again
+      return;
+    }
+
     reachedEndOfContent = true;
+    console.log(
+      `KM77 Customizer: Marked as reached end of content. Reason: ${reason}`
+    );
+
+    // Store this state in sessionStorage to persist across page interactions
+    try {
+      sessionStorage.setItem("km77EndOfContentReached", "true");
+      sessionStorage.setItem("km77EndOfContentReason", reason);
+    } catch (e) {
+      console.warn("KM77 Customizer: Could not store end-of-content state", e);
+    }
 
     // Clear any auto-load interval when we've reached the end
     if (loadMoreCheckInterval) {
@@ -557,18 +410,16 @@ const KM77PaginationManager = (function () {
     }
 
     // Update UI to show we've reached the end
-    updateEndOfContentUI(true);
-
-    console.log("KM77 Customizer: Marked as reached end of content");
+    updateEndOfContentUI(true, reason);
   }
 
   // Update UI to show end of content state
-  function updateEndOfContentUI(endReached) {
+  function updateEndOfContentUI(endReached, reason = "") {
     // Update load more button if it exists
     const loadMoreButton = document.querySelector(".km77-load-more");
     if (loadMoreButton) {
       if (endReached) {
-        loadMoreButton.textContent = "No hay más resultados";
+        loadMoreButton.textContent = reason || "No hay más resultados";
         loadMoreButton.disabled = true;
         loadMoreButton.style.opacity = "0.5";
       } else {
@@ -587,7 +438,9 @@ const KM77PaginationManager = (function () {
       const loadMoreLink =
         KM77.filterStatusDiv.querySelector(".load-more-link");
       if (loadMoreLink && endReached) {
-        loadMoreLink.textContent = " [Fin de resultados]";
+        loadMoreLink.textContent = reason
+          ? ` [${reason}]`
+          : " [Fin de resultados]";
         loadMoreLink.style.color = "#ffcc00";
         loadMoreLink.style.cursor = "default";
         loadMoreLink.onclick = (e) => e.preventDefault();
@@ -603,7 +456,7 @@ const KM77PaginationManager = (function () {
 
     // Show a message about reaching the end
     if (endReached && KM77.statusDiv) {
-      KM77.statusDiv.innerHTML = "No hay más resultados para cargar";
+      KM77.statusDiv.innerHTML = reason || "No hay más resultados para cargar";
       KM77.statusDiv.style.display = "block";
       setTimeout(() => {
         KM77.statusDiv.style.display = "none";
@@ -613,24 +466,67 @@ const KM77PaginationManager = (function () {
 
   // Reset all pagination state (including end of content flag)
   function resetPaginationState() {
+    // Clear sessionStorage state
+    try {
+      sessionStorage.removeItem("km77EndOfContentReached");
+      sessionStorage.removeItem("km77EndOfContentReason");
+    } catch (e) {
+      console.warn("KM77 Customizer: Could not clear sessionStorage state", e);
+    }
+
     reachedEndOfContent = false;
     currentBatchCount = 0;
     batchInProgress = false;
     consecutiveLoadCount = 0;
     emptyResponseCount = 0;
+    autoLoadScheduled = false;
 
-    // Don't reset totalLoadsThisSession to maintain the session limit
+    // Clear any existing interval
+    if (loadMoreCheckInterval) {
+      clearInterval(loadMoreCheckInterval);
+      loadMoreCheckInterval = null;
+    }
+
+    // Keep track of total loads but set a timeout to reset it if no activity
+    if (totalLoadsThisSession > 0) {
+      setTimeout(() => {
+        if (totalLoadsThisSession > 0) {
+          console.log(
+            "KM77 Customizer: Resetting total loads counter due to inactivity"
+          );
+          totalLoadsThisSession = 0;
+        }
+      }, 60000); // Reset after 1 minute of inactivity
+    }
+
     console.log("KM77 Customizer: Reset pagination state");
   }
 
   // Setup scroll monitoring for load more functionality
   function setupScrollMonitoring() {
+    // Check if we have a stored end-of-content state
+    try {
+      if (sessionStorage.getItem("km77EndOfContentReached") === "true") {
+        const reason = sessionStorage.getItem("km77EndOfContentReason") || "";
+        console.log(
+          `KM77 Customizer: Restored end-of-content state from session. Reason: ${reason}`
+        );
+        reachedEndOfContent = true;
+        updateEndOfContentUI(true, reason);
+      }
+    } catch (e) {
+      console.warn("KM77 Customizer: Could not read sessionStorage state", e);
+    }
+
     // More responsive scroll handler with improved throttling
     let scrollTimeout;
     let lastScrollTime = 0;
     const throttleDelay = 250; // 250ms for less frequent checks
 
     window.addEventListener("scroll", function () {
+      // Don't process scroll events if we've reached the end
+      if (reachedEndOfContent) return;
+
       const now = Date.now();
 
       // If we're actively scrolling, use throttling to avoid excessive checks
@@ -649,6 +545,9 @@ const KM77PaginationManager = (function () {
 
     // Also check when window is resized
     window.addEventListener("resize", function () {
+      // Don't process resize events if we've reached the end
+      if (reachedEndOfContent) return;
+
       if (scrollTimeout) clearTimeout(scrollTimeout);
       scrollTimeout = setTimeout(checkScrollPositionForLoadMore, 300);
     });
@@ -671,7 +570,7 @@ const KM77PaginationManager = (function () {
         if (event.detail.count === 0) {
           emptyResponseCount++;
           if (emptyResponseCount >= MAX_EMPTY_RESPONSES) {
-            setEndOfContentReached();
+            setEndOfContentReached("No se encontraron filas nuevas");
           }
         } else {
           // Reset empty response counter on success
@@ -692,13 +591,21 @@ const KM77PaginationManager = (function () {
 
         // Batch is no longer in progress
         batchInProgress = false;
+
+        // Check if we've hit the row limit after adding rows
+        if (getTotalRowCount() >= ABSOLUTE_ROW_LIMIT) {
+          console.log(
+            `KM77 Customizer: Reached absolute row limit (${ABSOLUTE_ROW_LIMIT})`
+          );
+          setEndOfContentReached("Límite de filas alcanzado");
+        }
       }, 100);
     });
 
     // Listen for end of content events
     document.addEventListener("km77EndOfContent", function () {
       console.log("KM77 Customizer: Received end of content event");
-      setEndOfContentReached();
+      setEndOfContentReached("Fin de contenido indicado por el sitio");
     });
 
     // Reset pagination state when a new page or search is started
