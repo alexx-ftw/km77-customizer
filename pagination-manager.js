@@ -9,7 +9,7 @@ const KM77PaginationManager = (function () {
   let lastAttemptTime = 0;
 
   // Batch loading configuration
-  const BATCH_SIZE = 100; // Maximum cars per batch
+  const BATCH_SIZE = 20; // Maximum cars per batch
   let currentBatchCount = 0;
   let batchInProgress = false;
 
