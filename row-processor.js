@@ -1,4 +1,4 @@
-// KM77 Customizer - Row Processor Module - Version 6
+// KM77 Customizer - Row Processor Module - Version 7
 // Handles processing of car rows and data extraction
 
 const KM77RowProcessor = (function () {
@@ -34,15 +34,55 @@ const KM77RowProcessor = (function () {
       `KM77 Customizer: Found ${carRows.length} total car listings, ${unprocessedRows.length} need processing.`
     );
 
-    // Only reset the processed count if we're starting a fresh batch
-    if (KM77.processedCount >= carRows.length || KM77.processedCount === 0) {
-      KM77.processedCount = 0;
+    // Reset the processed count to ensure accurate tracking
+    // Only reset if we're starting a fresh batch or if the count is greater than actual rows
+    if (
+      KM77.processedCount >= carRows.length ||
+      KM77.processedCount === 0 ||
+      unprocessedRows.length > 0
+    ) {
+      // Count rows that are already processed to get an accurate starting point
+      const alreadyProcessed = carRows.length - unprocessedRows.length;
+      KM77.processedCount = alreadyProcessed;
+
+      // Update the status immediately to show correct starting point
+      KM77UI.updateStatus(KM77.processedCount, carRows.length);
+      console.log(
+        `KM77 Customizer: Reset processed count to ${alreadyProcessed}/${carRows.length}`
+      );
     }
 
-    // Process each row with its index to ensure unique identification
-    carRows.forEach((row, index) => processCarRow(row, index));
+    // Process in smaller batches to prevent browser freeze
+    const BATCH_SIZE = 5; // Process only 5 rows at a time
+    let currentBatchIndex = 0;
 
-    KM77.isProcessing = false;
+    function processBatch() {
+      const start = currentBatchIndex;
+      const end = Math.min(currentBatchIndex + BATCH_SIZE, carRows.length);
+
+      // Process this batch of rows
+      for (let i = start; i < end; i++) {
+        processCarRow(carRows[i], i);
+      }
+
+      // Update currentBatchIndex for next batch
+      currentBatchIndex = end;
+
+      // If we're not done, schedule next batch with a delay
+      if (currentBatchIndex < carRows.length) {
+        setTimeout(processBatch, 200); // 200ms delay between batches
+      } else {
+        KM77.isProcessing = false;
+        console.log("KM77 Customizer: All rows processed");
+      }
+    }
+
+    // Start the batch processing
+    if (unprocessedRows.length > 0) {
+      processBatch();
+    } else {
+      KM77.isProcessing = false;
+    }
   }
 
   // Process a single car row
@@ -129,6 +169,11 @@ const KM77RowProcessor = (function () {
         cylinderCell,
         "Sin enlace"
       );
+
+      // Mark this row as done processing
+      processingRows.delete(rowId);
+
+      // Update the status counter
       KM77UI.updateStatus(
         ++KM77.processedCount,
         KM77.mainTable.querySelectorAll("tbody tr.search").length
@@ -172,6 +217,11 @@ const KM77RowProcessor = (function () {
           speakersCell,
           row
         );
+
+        // Mark this row as done processing
+        processingRows.delete(rowId);
+
+        // Update the status counter
         KM77UI.updateStatus(
           ++KM77.processedCount,
           KM77.mainTable.querySelectorAll("tbody tr.search").length
@@ -185,13 +235,18 @@ const KM77RowProcessor = (function () {
             speakersCell,
             row
           );
+
+          // Mark this row as done processing
+          processingRows.delete(rowId);
+
+          // Update the status counter
           KM77UI.updateStatus(
             ++KM77.processedCount,
             KM77.mainTable.querySelectorAll("tbody tr.search").length
           );
         } else {
           // Need to fetch equipment data
-          fetchEquipmentData(carId, carDetailsUrl, speakersCell, row);
+          fetchEquipmentData(carId, carDetailsUrl, speakersCell, row, rowId);
         }
       }
     } else {
@@ -204,7 +259,8 @@ const KM77RowProcessor = (function () {
         speedCell,
         accelCell,
         cylinderCell,
-        row
+        row,
+        rowId
       );
     }
   }
@@ -218,7 +274,8 @@ const KM77RowProcessor = (function () {
     speedCell,
     accelCell,
     cylinderCell,
-    row
+    row,
+    rowId
   ) {
     GM_xmlhttpRequest({
       method: "GET",
@@ -259,7 +316,7 @@ const KM77RowProcessor = (function () {
           ) {
             // If the main page doesn't contain speaker info but has a link to equipment page,
             // make a second request just for speakers
-            fetchEquipmentData(carId, carDetailsUrl, speakersCell, row);
+            fetchEquipmentData(carId, carDetailsUrl, speakersCell, row, rowId);
           } else {
             // Try to extract speaker data from the main page
             try {
@@ -274,10 +331,11 @@ const KM77RowProcessor = (function () {
               speakersCell.innerHTML = "-";
               KM77.speakerData.set(carId, "0");
             }
-            // Mark this row as processed now that we're done with it
-            KM77.processedRows.set(rowId, true);
+
+            // Mark this row as done processing
             processingRows.delete(rowId);
 
+            // Update the status counter properly
             KM77UI.updateStatus(
               ++KM77.processedCount,
               KM77.mainTable.querySelectorAll("tbody tr.search").length
@@ -292,10 +350,11 @@ const KM77RowProcessor = (function () {
             accelCell,
             cylinderCell
           );
-          // Mark as processed even on error to avoid repeated attempts
-          KM77.processedRows.set(rowId, true);
+
+          // Mark this row as done processing even with error
           processingRows.delete(rowId);
 
+          // Update the status counter
           KM77UI.updateStatus(
             ++KM77.processedCount,
             KM77.mainTable.querySelectorAll("tbody tr.search").length
@@ -312,6 +371,7 @@ const KM77RowProcessor = (function () {
           accelCell,
           cylinderCell,
           row,
+          rowId,
           error
         );
       },
@@ -325,6 +385,7 @@ const KM77RowProcessor = (function () {
           accelCell,
           cylinderCell,
           row,
+          rowId,
           "timeout"
         );
       },
@@ -332,7 +393,7 @@ const KM77RowProcessor = (function () {
   }
 
   // Fetch equipment data separately
-  function fetchEquipmentData(carId, carDetailsUrl, speakersCell, row) {
+  function fetchEquipmentData(carId, carDetailsUrl, speakersCell, row, rowId) {
     const equipmentUrl = carDetailsUrl.replace("/datos", "/datos/equipamiento");
 
     // Check if we have cached equipment data
@@ -347,10 +408,11 @@ const KM77RowProcessor = (function () {
         speakersCell,
         row
       );
-      // Mark as processed when done
-      KM77.processedRows.set(rowId, true);
+
+      // Mark as done processing
       processingRows.delete(rowId);
 
+      // Update the status counter
       KM77UI.updateStatus(
         ++KM77.processedCount,
         KM77.mainTable.querySelectorAll("tbody tr.search").length
@@ -384,9 +446,9 @@ const KM77RowProcessor = (function () {
         }
 
         // Always mark as processed when we're done
-        KM77.processedRows.set(rowId, true);
         processingRows.delete(rowId);
 
+        // Update the status counter
         KM77UI.updateStatus(
           ++KM77.processedCount,
           KM77.mainTable.querySelectorAll("tbody tr.search").length
@@ -398,9 +460,9 @@ const KM77RowProcessor = (function () {
         KM77.speakerData.set(carId, "0");
 
         // Mark as processed even on error
-        KM77.processedRows.set(rowId, true);
         processingRows.delete(rowId);
 
+        // Update the status counter
         KM77UI.updateStatus(
           ++KM77.processedCount,
           KM77.mainTable.querySelectorAll("tbody tr.search").length
@@ -412,9 +474,9 @@ const KM77RowProcessor = (function () {
         KM77.speakerData.set(carId, "0");
 
         // Mark as processed even on timeout
-        KM77.processedRows.set(rowId, true);
         processingRows.delete(rowId);
 
+        // Update the status counter
         KM77UI.updateStatus(
           ++KM77.processedCount,
           KM77.mainTable.querySelectorAll("tbody tr.search").length
@@ -433,6 +495,7 @@ const KM77RowProcessor = (function () {
     accelCell,
     cylinderCell,
     row,
+    rowId,
     error
   ) {
     console.warn(
@@ -462,7 +525,8 @@ const KM77RowProcessor = (function () {
           speedCell,
           accelCell,
           cylinderCell,
-          row
+          row,
+          rowId
         );
       }, delay);
     } else {
@@ -472,8 +536,14 @@ const KM77RowProcessor = (function () {
         speakersCell,
         speedCell,
         accelCell,
-        cylinderCell
+        cylinderCell,
+        "Max retries"
       );
+
+      // Mark as done processing
+      processingRows.delete(rowId);
+
+      // Update the status counter
       KM77UI.updateStatus(
         ++KM77.processedCount,
         KM77.mainTable.querySelectorAll("tbody tr.search").length
